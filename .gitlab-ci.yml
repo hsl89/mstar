@@ -1,0 +1,17 @@
+default:
+  image: python:3.6-buster
+
+stages:
+  - test
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+pytest:
+  stage: test
+  script:
+    - python3 -m pip install pytest
+    - python3 -m pip install torch==1.8.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+    - python3 -m pip install pyarrow
+    - python3 -m pip install -e .  --no-build-isolation  # Speed up fairscale build https://github.com/facebookresearch/fairscale/issues/305
+    - python3 -m pytest ./tests
