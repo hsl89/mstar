@@ -1,13 +1,12 @@
 """Pretraining on code"""
 import tqdm
 import argparse
-import time
 import os
 import pathlib
 import random
-import math
 import multiprocessing
 
+import mstar
 from smart_open import open
 import gluonnlp as nlp
 import numpy as np
@@ -22,8 +21,8 @@ def parse_args():
 
     # Model
     group = parser.add_argument_group('Model')
-    group.add_argument('--model-name', type=str, default='google_en_cased_bert_base',
-                       choices=nlp.models.bert.list_pretrained_bert(),
+    group.add_argument('--model-name', type=str, default='google_en_uncased_bert_base',
+                       choices=mstar.models.bert.bert_cfg_reg.list_keys(),
                        help='Name of the model configuration.')
 
     # Input
@@ -220,7 +219,6 @@ def main():
         convention refers to the function executed during map.
 
         """
-        # TODO gluonnlp shouldn't provide a slow LegacyHuggingFaceTokenizer here...
         _, tokenizer, _, _ = nlp.models.bert.get_pretrained_bert(args.model_name,
                                                                  load_backbone=False,
                                                                  load_mlm=False)

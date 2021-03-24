@@ -30,21 +30,13 @@ if VERSION.endswith('dev'):
     VERSION = VERSION + datetime.today().strftime('%Y%m%d')
 
 requirements = [
-    'absl-py',
     'boto3',
-    'javalang>=0.13.0',
     'h5py>=2.10.0',
     'yacs>=0.1.8',
-    'protobuf',
-    'unidiff',
-    'scipy',
     'sentencepiece',
     'tqdm',
-    'xarray',
     'regex',
     'requests',
-    'jsonlines',
-    'contextvars',
     'pyarrow>=3',
     'transformers>=4.3.0',
     'tensorboard',
@@ -52,8 +44,6 @@ requirements = [
     'contextvars;python_version<"3.7"',  # Contextvars for python <= 3.6
     'dataclasses;python_version<"3.7"',  # Dataclass for python <= 3.6
     'pickle5;python_version<"3.8"',  # pickle protocol 5 for python <= 3.8
-    'fasttext>=0.9.1,!=0.9.2',  # Fix to 0.9.1 due to https://github.com/facebookresearch/fastText/issues/1052
-    'tree_sitter==0.2.2',
     'graphviz',
     'fairscale',
     'asttokens',

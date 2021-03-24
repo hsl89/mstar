@@ -16,7 +16,7 @@ sudo mount /dev/nvme1n1 /mnt
 sudo chown ubuntu:ubuntu /mnt/
 ```
 
-1. Get the dataset
+1. Get the dataset (with help of https://github.com/dmlc/gluon-nlp nlp_data tool)
 
 ```bash
 nlp_data prepare_bookcorpus --segment_sentences --segment_num_worker 16
@@ -32,20 +32,20 @@ python3 prepare_quickthought.py \
     --input-reference input_reference \
     --output /mnt/out_quickthought_128 \
     --model-name google_en_uncased_bert_base \
-    --max-seq-length 128
+    --max-seq-length 128 --dupe-factor 5
 ```
 
 ```bash
 python3 -m torch.distributed.launch --nproc_per_node=8 run_pretraining.py \
   --model_name google_en_uncased_bert_base \
-  --lr 0.005 \
-  --log_interval 1 \
-  --batch_size 128 \
-  --num_accumulated 96 \
+  --lr 2e-4 \
+  --log_interval 100 \
+  --batch_size 256 \
+  --num_accumulated 1 \
   --num_dataloader_workers 4 \
-  --num_steps 3870 \
+  --num_steps 225000 \
   --input-files /mnt/out_quickthought_128/*feather \
-  --mmap-folder /mnt/gluonnlp_mmap \
+  --mmap-folder /mnt/mstar_mmap \
   --ckpt_dir /mnt/ckpt_dir \
   --ckpt_interval 1000 2>&1| tee train.log;
 ```
@@ -57,32 +57,30 @@ python3 prepare_quickthought.py \
     --input-reference input_reference \
     --output /mnt/out_quickthought_512 \
     --model-name google_en_uncased_bert_base \
-    --max-seq-length 512
+    --max-seq-length 512 --dupe-factor 5
 ```
 
 ```bash
 python3 -m torch.distributed.launch --nproc_per_node=8 run_pretraining.py \
   --model_name google_en_uncased_bert_base \
-  --lr 0.005 \
-  --log_interval 1 \
+  --lr 2e-4 \
+  --log_interval 100 \
   --batch_size 32 \
-  --num_accumulated 384 \
+  --num_accumulated 4 \
   --num_dataloader_workers 4 \
-  --num_steps 4301 \
-  --start_step 3870 \
-  --warmup_ratio 0.192 \
-  --const_ratio 0.108 \
+  --num_steps 25000 \
+  --start_step 225000 \
   --phase2 \
-  --phase1_num_steps 3870 \
+  --phase1_num_steps 225000 \
   --input-files /mnt/out_quickthought_512/*feather \
-  --mmap-folder /mnt/gluonnlp_mmap \
-  --ckpt_dir /mnt/ckpt_dir2 | tee train.log;
+  --mmap-folder /mnt/mstar_mmap \
+  --ckpt_dir /mnt/ckpt_dir | tee train.log;
 ```
 
 Finally we obtain a folder of structure as followed,
 
 ```
-google_en_cased_bert_base
+google_en_uncased_bert_base
 ├── vocab-{short_hash}.json
 ├── model-{short_hash}.params
 ├── model-{short_hash}.yml

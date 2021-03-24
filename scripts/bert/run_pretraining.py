@@ -18,6 +18,7 @@ import pyarrow as pa
 import pyarrow.compute
 import pyarrow.dataset
 import torch as th
+import transformers
 from fairscale.nn.data_parallel import ShardedDataParallel
 from fairscale.optim.grad_scaler import ShardedGradScaler
 from fairscale.optim.oss import OSS
@@ -63,8 +64,8 @@ def parse_args():
 
     # model
     group = parser.add_argument_group('Model')
-    group.add_argument('--model_name', type=str, default='coder_base',
-                       choices=mstar.models.bert.list_pretrained_bert(),
+    group.add_argument('--model_name', type=str, default='google_en_uncased_bert_base',
+                       choices=mstar.models.bert.bert_cfg_reg.list_keys(),
                        help='Name of the model configuration.')
 
     # training
@@ -82,9 +83,9 @@ def parse_args():
     group.add_argument('--lr', type=float, default=0.005, help='Learning rate')
     group.add_argument('--weight_decay', type=float, default=0.01, help='weight decay')
     group.add_argument('--max_grad_norm', type=float, default=1.0, help='Max gradient norm.')
-    group.add_argument('--warmup_ratio', type=float, default=0.05,
+    group.add_argument('--warmup_ratio', type=float, default=0.01,
                        help='Ratio of warmup steps in the learning rate scheduler.')
-    group.add_argument('--const_ratio', type=float, default=0.25,
+    group.add_argument('--const_ratio', type=float, default=0.0,
                        help='Ratio of constant steps in the learning rate scheduler.')
 
     group.add_argument('--num_dataloader_workers', type=int, default=4,
@@ -115,14 +116,11 @@ def parse_args():
     return args
 
 
-def final_save(model, save_dir, vocab, cfg):
+def final_save(model, save_dir, cfg):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     with open(os.path.join(save_dir, 'model.yml'), 'w') as f:
         f.write(cfg.dump())
-    with open(os.path.join(save_dir, 'vocab.json'), 'w') as f:
-        # TODO TypeError: Object of type Vocab is not JSON serializable
-        json.dump(vocab, f)
     th.save(model.state_dict(), os.path.join(save_dir, 'model.params'))
     logging.info('Statistics:')
     old_names = os.listdir(save_dir)
@@ -180,8 +178,9 @@ def get_world_size(args):
 
 def collate_fn(indices, *, args, tbl):
     batch = tbl.take(indices).to_pydict()
-    pad_fn = mstar.torch.data.batchify.Pad()
-    input_id = pad_fn(batch['quickthought1'] + batch['quickthought2'])
+    input_id = th.nn.utils.rnn.pad_sequence(
+        [th.tensor(ele) for ele in batch['quickthought1'] + batch['quickthought2']],
+        batch_first=True)
     segment_id = th.zeros_like(input_id)
     valid_length = th.tensor(batch['validlength1'] + batch['validlength2'])
     mlm_positions = batch['mlmpositions1'] + batch['mlmpositions2']
@@ -195,18 +194,15 @@ def collate_fn(indices, *, args, tbl):
 
 
 def train(args, *, tbl):
-    cfg, tokenizer, _, _ = mstar.models.bert.get_pretrained_bert(args.model_name,
-                                                                 load_backbone=False,
-                                                                 load_mlm=False)
-    cfg = mstar.torch.models.bert.BertModel.get_cfg().clone_merge(cfg)
-    model = mstar.torch.models.bert.QTBertForPretrain(cfg)
+    cfg = mstar.models.bert.google_en_uncased_bert_base()
+    model = mstar.models.bert.QTBertForPretrain(cfg)
     model.to(args.device)
 
     if args.start_step:
         logging.info('Restart training from {}'.format(args.start_step))
         parameters_option(args.start_step, model, args, 'Loading')
     else:
-        model.apply(mstar.torch.models.bert.init_weights)
+        model.apply(mstar.models.bert.init_weights)
 
     writer = None
     if args.local_rank in (-1, 0):
@@ -234,25 +230,27 @@ def train(args, *, tbl):
 
     optimizer_arguments = {"lr": args.lr}
     if get_world_size(args) > 1 and args.ZeRO:
-        optimizer = OSS(params=model.parameters(), optim=mstar.torch.optimizers.FusedLANS,
+        optimizer = OSS(params=model.parameters(), optim=mstar.optimizers.FusedLANS,
                         **optimizer_arguments)
         model = ShardedDataParallel(model, optimizer)
     elif get_world_size(args) > 1:
-        optimizer = mstar.torch.optimizers.FusedLANS(optimizer_grouped_parameters,
-                                                     **optimizer_arguments)
+        optimizer = mstar.optimizers.FusedLANS(optimizer_grouped_parameters, **optimizer_arguments)
         model = DistributedDataParallel(model, device_ids=[args.local_rank],
                                         output_device=args.local_rank, find_unused_parameters=True)
     else:
-        optimizer = mstar.torch.optimizers.FusedLANS(optimizer_grouped_parameters,
-                                                     **optimizer_arguments)
+        optimizer = mstar.optimizers.FusedLANS(optimizer_grouped_parameters, **optimizer_arguments)
 
     save_interval = args.ckpt_interval
     logging.info(f'#Total Training Steps={args.num_steps}, '
                  f'Warmup Steps={args.warmup_ratio * args.num_steps}, '
                  f'Save Interval={save_interval}')
-    scheduler = mstar.torch.optimizers.schedules.get_warmup_linear_const_decay_poly_schedule(
-        optimizer, total_steps=args.num_steps, warmup_ratio=args.warmup_ratio,
-        const_ratio=args.const_ratio)
+    assert not args.const_ratio
+    scheduler = transformers.get_linear_schedule_with_warmup(
+        optimizer, num_warmup_steps=args.warmup_ratio * args.num_steps,
+        num_training_steps=args.num_steps)
+    # scheduler = mstar.optimizers.schedules.get_warmup_linear_const_decay_poly_schedule(
+    #     optimizer, total_steps=args.num_steps, warmup_ratio=args.warmup_ratio,
+    #     const_ratio=args.const_ratio)
 
     if args.start_step:
         logging.info(f'Restart training from {args.start_step}')
@@ -394,7 +392,7 @@ def train(args, *, tbl):
 
     if args.local_rank in (0, -1):
         save_dir = os.path.join(args.ckpt_dir, args.model_name)
-        final_save(model, save_dir, tokenizer.vocab, cfg)
+        final_save(model, save_dir, cfg)
 
 
 def main():
@@ -428,19 +426,20 @@ def main():
         distributed.barrier()  # Wait for dataset
         train_tbl = mstar.utils.shm.load(args.mmap_folder / train_tbl_id)
     else:  # Main process
-        if args.local_rank != -1 and (args.mmap_folder / train_tbl_id / 'meta.pkl').exists():
-            distributed.barrier()  # Indicate dataset is ready
+        if (args.mmap_folder / train_tbl_id / 'meta.pkl').exists():
+            if args.local_rank != -1:
+                distributed.barrier()  # Indicate dataset is ready
             train_tbl = mstar.utils.shm.load(args.mmap_folder / train_tbl_id)
         else:
             (args.mmap_folder / train_tbl_id).mkdir(exist_ok=True, parents=True)
             ds = pa.dataset.dataset(args.input_files, format='feather')
             # Without combining chunks tbl.take is 1000x slower
             train_tbl = ds.to_table().combine_chunks()
+            mstar.utils.shm.serialize(args.mmap_folder / train_tbl_id, train_tbl)
             if args.local_rank != -1:
-                mstar.utils.shm.serialize(args.mmap_folder / train_tbl_id, train_tbl)
                 distributed.barrier()  # Indicate dataset is ready
-                del train_tbl
-                train_tbl = mstar.utils.shm.load(args.mmap_folder / train_tbl_id)
+            del train_tbl
+            train_tbl = mstar.utils.shm.load(args.mmap_folder / train_tbl_id)
 
     step_size = args.batch_size * args.num_accumulated * get_world_size(args)
     logging.info(f'Dataset has {len(train_tbl)} rows.')
