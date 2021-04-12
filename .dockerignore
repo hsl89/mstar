@@ -3,4 +3,5 @@
 
 # Allow
 !/.git
-!/tools/job.sh
+!/tools/cc100/count_job.sh
+!/tools/cc100/count_tokens.py
