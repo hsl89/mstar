@@ -15,3 +15,9 @@ pytest:
     - python3 -m pip install pyarrow
     - python3 -m pip install -e .  --no-build-isolation  # Speed up fairscale build https://github.com/facebookresearch/fairscale/issues/305
     - python3 -m pytest ./tests
+
+lint:
+  stage: test
+  script:
+    - python3 -m pip install flake8
+    - flake8 scripts/

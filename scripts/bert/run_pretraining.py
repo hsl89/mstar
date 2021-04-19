@@ -2,7 +2,6 @@
 import argparse
 import functools
 import hashlib
-import json
 import logging
 import os
 import pathlib
@@ -184,7 +183,7 @@ def collate_fn(indices, *, args, tbl):
     segment_id = th.zeros_like(input_id)
     valid_length = th.tensor(batch['validlength1'] + batch['validlength2'])
     mlm_positions = batch['mlmpositions1'] + batch['mlmpositions2']
-    # Masked positions with respect to flattened contextual_embedding (batch_size * seq_length, units)
+    # Masked positions with respect to flattened contextual_embedding (batch_size*seq_length,units)
     seq_length = input_id.shape[1]
     mlm_positions = [np.array(pos) + seq_length * i for i, pos in enumerate(mlm_positions)]
     mlm_positions = th.tensor(np.concatenate(mlm_positions).astype(np.int64))
@@ -208,7 +207,6 @@ def train(args, *, tbl):
     if args.local_rank in (-1, 0):
         writer = SummaryWriter(log_dir=os.path.join(args.ckpt_dir, 'tensorboard'))
 
-    # pin_memory=False due to lack of https://github.com/pytorch/pytorch/commit/54ce171f16c8859f829dde09f87c364c8a6b4130
     sampler = RandomSampler(tbl) if args.local_rank == -1 else DistributedSampler(
         tbl, seed=args.seed)
     # batch_size // 2 for QuickThought
@@ -402,13 +400,11 @@ def main():
     mstar.utils.misc.logging_config(args.ckpt_dir, name='pretrain_bert_' + str(args.local_rank),
                                     level=level, console=(args.local_rank in (0, -1)))
     # Setup CUDA, GPU & distributed training
-    local_size = 1
     if th.cuda.is_available() and args.cuda:
         th.cuda.set_device(args.local_rank if args.local_rank != -1 else 0)
         args.device = th.device("cuda", args.local_rank if args.local_rank != -1 else 0)
         if args.local_rank != -1:
             distributed.init_process_group(backend='nccl')
-            local_size = th.cuda.device_count()
     else:
         args.device = th.device("cpu")
         if args.local_rank != -1:
@@ -420,7 +416,7 @@ def main():
     logging.info(f'Training info: num_workers: {get_world_size(args)}, '
                  f'local rank: {args.local_rank}')
 
-    train_tbl_id = hashlib.shake_256( \
+    train_tbl_id = hashlib.shake_256(
         ";".join(str(p) for p in args.input_files).encode()).hexdigest(20)
     if args.local_rank not in (-1, 0):
         distributed.barrier()  # Wait for dataset

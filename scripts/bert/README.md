@@ -85,3 +85,21 @@ google_en_uncased_bert_base
 ├── model-{short_hash}.params
 ├── model-{short_hash}.yml
 ```
+
+
+# Sequence Tagging Data
+
+To generate the label vocabulary, run this command in the outermost data directory. 
+```bash
+find ./ -name 'train.txt' -exec cat {} \; | sed "/^$/d" | awk '{print $NF}' | sort | uniq > label_vocab
+```
+
+To create the batches run the following command:
+```bash
+python3 prepare_seqtagging.py \
+    --input-directory <path_to_input_directory> \
+    --label-vocab <path_to_label_vocab> \
+    --output-directory <path_to_output_directory> \
+    --model-name google_en_uncased_bert_base \
+    --max-seq-length 128 --dupe-factor 5
+```
