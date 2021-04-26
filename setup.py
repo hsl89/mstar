@@ -45,6 +45,9 @@ requirements = [
     'dataclasses;python_version<"3.7"',  # Dataclass for python <= 3.6
     'pickle5;python_version<"3.8"',  # pickle protocol 5 for python <= 3.8
     'graphviz',
+    'pytorch-lightning@git+https://github.com/PyTorchLightning/pytorch-lightning#3cc0b2c063e7d9f172f8060a626f883cca1bae93',
+    'jsonargparse[signatures]',
+    'torchmetrics',
     'fairscale',
     'asttokens',
 ]
@@ -61,6 +64,7 @@ if (torch.cuda.is_available() and CUDA_HOME is not None) or force_cuda:
             ],
             sources=[
                 "src/mstar/clib/amp_C_frontend.cpp", "src/mstar/clib/multi_tensor_lans.cu",
+                "src/mstar/clib/multi_tensor_adam.cu",
                 "src/mstar/clib/multi_tensor_l2norm_kernel.cu"
             ],
             extra_compile_args={

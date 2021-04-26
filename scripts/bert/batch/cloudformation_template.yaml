@@ -1,0 +1,452 @@
+Description: lausen mstar dev infra
+Resources:
+  ################################################################################
+  # S3 Bucket for temporary files (cleared after 31 days)
+  ################################################################################
+  S3DevBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-dev'
+      LifecycleConfiguration:
+        Rules:
+          - Id: ObjectExpiration
+            Status: Enabled
+            ExpirationInDays: '31'
+      ObjectLockEnabled: true
+      ObjectLockConfiguration:
+        ObjectLockEnabled: Enabled
+        Rule:
+          DefaultRetention:
+            Days: 7
+            Mode: GOVERNANCE
+  ################################################################################
+  # Container Repository for AWS Batch
+  ################################################################################
+  ECR:
+    Type: AWS::ECR::Repository
+    Properties:
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+            {
+              "rulePriority": 1,
+              "description": "Only keep 3 images",
+              "selection": {
+                "tagStatus": "any",
+                "countType": "imageCountMoreThan",
+                "countNumber": 3
+              },
+              "action": { "type": "expire" }
+            }]
+          }
+      RepositoryName: { Ref: "AWS::StackName" }
+  ################################################################################
+  # Network configuration for AWS Batch
+  ################################################################################
+  BatchVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+  # IPV6 enabled VPC is needed for task networking without NAT Gateways for AWS
+  # Batch Multi-Node jobs. See "Using a VPC in dual-stack mode" at
+  # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-networking.html
+  BatchVpcCidrBlockIpv6:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      VpcId: !Ref BatchVPC
+      AmazonProvidedIpv6CidrBlock: true
+  # Public subnets
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref BatchVPC
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref BatchVPC
+  InternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+  InternetIPv6Route:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      DestinationIpv6CidrBlock: '::/0'
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+  IPv6SubnetA:
+    Type: AWS::EC2::Subnet
+    DependsOn: BatchVpcCidrBlockIpv6
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-1a
+      CidrBlock: 10.0.0.0/24
+      Ipv6CidrBlock: !Select [0, !Cidr [!Select [0, !GetAtt 'BatchVPC.Ipv6CidrBlocks'], 256, 64]]
+      AssignIpv6AddressOnCreation: true
+  IPv6SubnetB:
+    Type: AWS::EC2::Subnet
+    DependsOn: BatchVpcCidrBlockIpv6
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-1b
+      CidrBlock: 10.0.1.0/24
+      Ipv6CidrBlock: !Select [1, !Cidr [!Select [0, !GetAtt 'BatchVPC.Ipv6CidrBlocks'], 256, 64]]
+      AssignIpv6AddressOnCreation: true
+  IPv6SubnetC:
+    Type: AWS::EC2::Subnet
+    DependsOn: BatchVpcCidrBlockIpv6
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-1c
+      CidrBlock: 10.0.2.0/24
+      Ipv6CidrBlock: !Select [2, !Cidr [!Select [0, !GetAtt 'BatchVPC.Ipv6CidrBlocks'], 256, 64]]
+      AssignIpv6AddressOnCreation: true
+  IPv6SubnetD:
+    Type: AWS::EC2::Subnet
+    DependsOn: BatchVpcCidrBlockIpv6
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-1d
+      CidrBlock: 10.0.3.0/24
+      Ipv6CidrBlock: !Select [3, !Cidr [!Select [0, !GetAtt 'BatchVPC.Ipv6CidrBlocks'], 256, 64]]
+      AssignIpv6AddressOnCreation: true
+  IPv6SubnetE:
+    Type: AWS::EC2::Subnet
+    DependsOn: BatchVpcCidrBlockIpv6
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-1e
+      CidrBlock: 10.0.4.0/24
+      Ipv6CidrBlock: !Select [4, !Cidr [!Select [0, !GetAtt 'BatchVPC.Ipv6CidrBlocks'], 256, 64]]
+      AssignIpv6AddressOnCreation: true
+  IPv6SubnetF:
+    Type: AWS::EC2::Subnet
+    DependsOn: BatchVpcCidrBlockIpv6
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-1f
+      CidrBlock: 10.0.5.0/24
+      Ipv6CidrBlock: !Select [5, !Cidr [!Select [0, !GetAtt 'BatchVPC.Ipv6CidrBlocks'], 256, 64]]
+      AssignIpv6AddressOnCreation: true
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-1a
+      CidrBlock: 10.0.20.0/24
+      MapPublicIpOnLaunch: true
+  SubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-1b
+      CidrBlock: 10.0.21.0/24
+      MapPublicIpOnLaunch: true
+  SubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-1c
+      CidrBlock: 10.0.22.0/24
+      MapPublicIpOnLaunch: true
+  SubnetD:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-1d
+      CidrBlock: 10.0.23.0/24
+      MapPublicIpOnLaunch: true
+  SubnetE:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-1e
+      CidrBlock: 10.0.24.0/24
+      MapPublicIpOnLaunch: true
+  SubnetF:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-1f
+      CidrBlock: 10.0.25.0/24
+      MapPublicIpOnLaunch: true
+  IPv6SubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref IPv6SubnetA
+  IPv6SubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref IPv6SubnetB
+  IPv6SubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref IPv6SubnetC
+  IPv6SubnetDRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref IPv6SubnetD
+  IPv6SubnetERouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref IPv6SubnetE
+  IPv6SubnetFRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref IPv6SubnetF
+  SubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetA
+  SubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetB
+  SubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetC
+  SubnetDRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetD
+  SubnetERouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetE
+  SubnetFRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetF
+  BatchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'AWS-Batch-${AWS::StackName}'
+      VpcId: !Ref BatchVPC
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: -1
+          CidrIpv6: "::/0"
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: -1
+          CidrIpv6: "::/0"
+  ################################################################################
+  # Roles for AWS Batch
+  ################################################################################
+  BatchServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - 'batch.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole'
+  BatchExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - 'ecs-tasks.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+  BatchJobRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - 'ecs-tasks.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+      - PolicyName: BucketAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action: [ 's3:GetObject', 's3:PutObject' ]
+              Resource: [ !GetAtt S3DevBucket.Arn, !Sub '${S3DevBucket.Arn}/*' ]
+            - Effect: Allow
+              Action: [ 's3:GetObject' ]
+              Resource: [ "arn:aws:s3:::mstar-data","arn:aws:s3:::mstar-data/*" ]
+  EcsInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Service: "ec2.amazonaws.com"
+          Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role'
+  EcsInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+      - Ref: EcsInstanceRole
+  ################################################################################
+  # AWS Batch
+  ################################################################################
+  BatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/${AWS::StackName}/log'
+      RetentionInDays: 14
+  # Managed Serverless Environment
+  BatchComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ServiceRole: !GetAtt BatchServiceRole.Arn
+      ComputeResources:
+        MaxvCpus: 16384
+        Type: FARGATE
+        SecurityGroupIds:
+        - !Ref BatchSecurityGroup
+        Subnets:
+        - !Ref IPv6SubnetA
+        - !Ref IPv6SubnetB
+        - !Ref IPv6SubnetC
+        - !Ref IPv6SubnetD
+        - !Ref IPv6SubnetE
+        - !Ref IPv6SubnetF
+      State: ENABLED
+  BatchJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      JobQueueName: !Sub '${AWS::StackName}-fargate'
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - ComputeEnvironment: !Ref BatchComputeEnvironment
+          Order: 1
+  BatchJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: container
+      JobDefinitionName: !Sub '${AWS::StackName}-fargate'
+      PlatformCapabilities:
+      - FARGATE
+      Timeout:
+        AttemptDurationSeconds: 604800  # 7 days
+      RetryStrategy:  # Retry Fargate Jobs that failed for internal exceptions https://sim.amazon.com/issues/BATCH-8613
+        Attempts: 3
+        EvaluateOnExit:
+          - Action: RETRY
+            OnStatusReason: "Timeout*"
+      ContainerProperties:
+        Image: !Sub '${AWS::AccountId}.dkr.ecr.us-east-1.amazonaws.com/${AWS::StackName}:latest'
+        Command: ["echo", "hello world"]
+        NetworkConfiguration:
+          AssignPublicIp: ENABLED
+        ResourceRequirements:
+        - Type: VCPU
+          Value: 1
+        - Type: MEMORY
+          Value: 8192
+        JobRoleArn: !GetAtt BatchJobRole.Arn
+        ExecutionRoleArn: !GetAtt BatchExecutionRole.Arn
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            "awslogs-group": !Ref BatchLogGroup
+  # Managed EC2 Compute Optimized Environment
+  C5BatchComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ServiceRole: !GetAtt BatchServiceRole.Arn
+      ComputeResources:
+        MaxvCpus: 3072
+        MinvCpus: 0
+        Type: EC2
+        Ec2Configuration:
+          - ImageType: ECS_AL2
+        AllocationStrategy: BEST_FIT_PROGRESSIVE
+        InstanceRole: !Ref EcsInstanceProfile
+        InstanceTypes:
+          - c5.24xlarge
+        Tags: {"Name" : "Batch Instance - C5OnDemand"}
+        SecurityGroupIds:
+        - !Ref BatchSecurityGroup
+        Subnets:
+        - !Ref SubnetA
+        - !Ref SubnetB
+        - !Ref SubnetC
+        - !Ref SubnetD
+        - !Ref SubnetE
+        - !Ref SubnetF
+      State: ENABLED
+  C5BatchJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      JobQueueName: !Sub '${AWS::StackName}-c5'
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - ComputeEnvironment: !Ref C5BatchComputeEnvironment
+          Order: 1
+  C5BatchJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: container
+      JobDefinitionName: !Sub '${AWS::StackName}-c5'
+      Timeout:
+        AttemptDurationSeconds: 604800  # 7 days
+      ContainerProperties:
+        Command: ["echo", "hello world"]
+        Image: !Sub '${AWS::AccountId}.dkr.ecr.us-east-1.amazonaws.com/${AWS::StackName}:latest'
+        JobRoleArn: !GetAtt BatchJobRole.Arn
+        Vcpus: 96
+        Memory: 189000  # Only 189118 out of 196608 of c5.24x is usable on ECS
+        LinuxParameters:
+          SharedMemorySize: 131072
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            "awslogs-group": !Ref BatchLogGroup
+

@@ -77,7 +77,7 @@ class BertTransformer(th.nn.Module):
                  num_heads: int = 8, attention_dropout_prob: float = 0.,
                  hidden_dropout_prob: float = 0., output_attention: bool = False,
                  output_all_encodings: bool = False, layer_norm_eps: float = 1E-12,
-                 activation='gelu', layout='NT'):
+                 activation='gelu', layout='NT', *, pre_norm=False):
         super().__init__()
         assert units % num_heads == 0,\
             'In BertTransformer, The units should be divided exactly ' \
@@ -94,7 +94,7 @@ class BertTransformer(th.nn.Module):
                                     attention_dropout_prob=attention_dropout_prob,
                                     hidden_dropout_prob=hidden_dropout_prob,
                                     layer_norm_eps=layer_norm_eps, activation=activation,
-                                    layout=layout) for _ in range(num_layers)
+                                    layout=layout, pre_norm=pre_norm) for _ in range(num_layers)
         ])
 
     @property
@@ -159,7 +159,8 @@ class BertModel(th.nn.Module):
     def __init__(self, vocab_size=30000, units=768, hidden_size=3072, num_layers=12, num_heads=12,
                  max_length=512, hidden_dropout_prob=0., attention_dropout_prob=0.,
                  num_token_types=2, pos_embed_type='learned', activation='gelu',
-                 layer_norm_eps=1E-12, use_pooler=True, layout='NT', compute_layout='auto'):
+                 layer_norm_eps=1E-12, use_pooler=True, layout='NT', compute_layout='auto', *,
+                 pre_norm=False):
         super().__init__()
         self.use_pooler = use_pooler
         self.pos_embed_type = pos_embed_type
@@ -179,7 +180,7 @@ class BertModel(th.nn.Module):
             units=units, hidden_size=hidden_size, num_layers=num_layers, num_heads=num_heads,
             attention_dropout_prob=attention_dropout_prob, hidden_dropout_prob=hidden_dropout_prob,
             output_attention=False, output_all_encodings=False, activation=activation,
-            layer_norm_eps=layer_norm_eps, layout=self._compute_layout)
+            layer_norm_eps=layer_norm_eps, layout=self._compute_layout, pre_norm=pre_norm)
         # Construct word embedding
         self.word_embed = th.nn.Embedding(num_embeddings=vocab_size, embedding_dim=units)
         self.embed_layer_norm = th.nn.LayerNorm(units, eps=self.layer_norm_eps)

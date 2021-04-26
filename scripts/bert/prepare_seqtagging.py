@@ -7,11 +7,9 @@ import pathlib
 import random
 import multiprocessing
 
-import mstar
 
-# from transformers import AutoTokenizer
+from transformers import AutoTokenizer
 from smart_open import open
-import gluonnlp as nlp
 import numpy as np
 import pyarrow as pa
 import pyarrow.feather
@@ -22,16 +20,6 @@ def parse_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description=__doc__,
-    )
-
-    # # Model
-    group = parser.add_argument_group("Model")
-    group.add_argument(
-        "--model-name",
-        type=str,
-        default="google_en_uncased_bert_base",
-        choices=mstar.models.bert.bert_cfg_reg.list_keys(),
-        help="Name of the model configuration.",
     )
 
     # Input
@@ -110,14 +98,10 @@ def set_seed(seed):
 
 
 def create_masked_lm_predictions(
-    *, args, tokens, cls_token_id, sep_token_id, mask_token_id, non_special_ids
+    *, args, tokens, mask_token_id, non_special_ids
 ):
     """Creates the predictions for the masked LM objective."""
-    cand_indexes = [
-        i
-        for i, tok in enumerate(tokens)
-        if tok not in (cls_token_id, sep_token_id)
-    ]
+    cand_indexes = list(range(len(tokens)))
     output_tokens = list(tokens)
     random.shuffle(cand_indexes)
     num_to_predict = min(
@@ -161,7 +145,7 @@ def process_file(path_pair):
     tokenizer = process_file.tokenizer
     schema = process_file.schema
     args = process_file.args
-    vocab = process_file.vocab
+    mask_id = process_file.mask_id
     non_special_ids = process_file.non_special_ids
 
     # Process file
@@ -188,13 +172,13 @@ def process_file(path_pair):
         )
     ]
 
-    print(
-        "Found {} document splits in input file {}".format(
-            len(document_boundary_indices), len(input_file)
-        )
-    )
+    # print(
+    #     "Found {} document splits in input file {}".format(
+    #         len(document_boundary_indices), len(input_file)
+    #     )
+    # )
 
-    for document_data in tqdm.tqdm(document_segmented_data):
+    for document_data in document_segmented_data:
         # According to the original tensorflow implementation: We *sometimes*
         # (i.e., short_seq_prob == 0.1, 10% of the time) want to use shorter
         # sequences to minimize the mismatch between pre-training and
@@ -217,7 +201,10 @@ def process_file(path_pair):
         seqtagging_labels = list(map(args.label_vocab.get, seqtagging_labels))
 
         # Tokenize
-        toks = tokenizer.encode(text, int)
+        toks = [
+            line.ids for line in tokenizer._tokenizer.encode_batch(
+                text, add_special_tokens=False, is_pretokenized=False)
+        ]
         # Repeat the sequence tagging labels for each wordpiece
         repeated_seqtagging_labels = [
             [seqtagging_labels[i]] * len(toks[i])
@@ -242,10 +229,8 @@ def process_file(path_pair):
             mlm_toks, mlmpositions, mlmlabels = create_masked_lm_predictions(
                 args=args,
                 tokens=final_toks,
-                cls_token_id=vocab.cls_id,
-                sep_token_id=vocab.sep_id,
-                mask_token_id=vocab.mask_id,
-                non_special_ids=non_special_ids,
+                mask_token_id=mask_id,
+                non_special_ids=non_special_ids
             )
 
             # Arrays in same order as schema
@@ -341,16 +326,12 @@ def main():
         convention refers to the function executed during map.
 
         """
-        _, tokenizer, _, _ = nlp.models.bert.get_pretrained_bert(
-            args.model_name, load_backbone=False, load_mlm=False
-        )
-        # tokenizer=AutoTokenizer.from_pretrained('facebook/mbart-large-cc25')
+        tokenizer = AutoTokenizer.from_pretrained('facebook/mbart-large-cc25')
         function.tokenizer = tokenizer
         function.args = args
-        function.vocab = tokenizer.vocab
-        function.non_special_ids = tokenizer.vocab[
-            tokenizer.vocab.non_special_tokens
-        ]
+        function.mask_id = tokenizer.vocab[tokenizer.mask_token]
+        non_special_ids = set(tokenizer.get_vocab().values()) - set(tokenizer.all_special_ids)
+        function.non_special_ids = list(non_special_ids)
 
         tok_type = (
             pa.uint16()

@@ -1,14 +1,6 @@
-NOTE: GluonNLP uses `/dev/shm/gluonnlp` shared memory filesystem to share
-datasets among multi-process workloads. At this time, `/dev/shm/gluonnlp` is not
-cleaned up automatically after the workload completes and manual deletion is
-needed to free up memory. Sometimes you may not want to delete
-`/dev/shm/gluonnlp` after running a workload, as you intend to run a workload
-based on same dataset later and it's useful to keep the dataset in shared
-memory.
+# Data
 
-# BERT
-
--1. p4 instance preparation
+p4 instance preparation
 
 ```bash
 sudo mkfs.btrfs /dev/nvme1n1 /dev/nvme2n1 /dev/nvme3n1 /dev/nvme4n1 /dev/nvme5n1 /dev/nvme6n1 /dev/nvme7n1 /dev/nvme8n1
@@ -16,90 +8,83 @@ sudo mount /dev/nvme1n1 /mnt
 sudo chown ubuntu:ubuntu /mnt/
 ```
 
-1. Get the dataset (with help of https://github.com/dmlc/gluon-nlp nlp_data tool)
+## Masked Language Modeling (MLM) + QuickThought (QT)
+
+Preprocess the subset of CC100 stored at `s3://mstar-data/cc100.txt.split.zst/`.
+(See Appendix for instructions to reproduce the subset.)
 
 ```bash
-nlp_data prepare_bookcorpus --segment_sentences --segment_num_worker 16
-nlp_data prepare_wikipedia --mode download_prepared --segment_sentences --segment_num_worker 16
-find wikicorpus/one_sentence_per_line BookCorpus/one_sentence_per_line -type f > input_reference
+# Follow the setup guide in ./batch/README.md first
+aws --profile mstar batch submit-job --job-queue lausen-mstar-c5 --job-name prepare-cc100 --job-definition lausen-mstar-c5 --array-properties size=566 --container-overrides '{"command": ["/usr/local/bin/job.sh", "128"] }'
 ```
 
+To create the batches for phase 2 pre-training, change 128 to 512.
 
-2. Phase 1 training with sequence length 128 (~20min + ~16 hours)
+
+## Sequence Tagging (NER)
 
 ```bash
-python3 prepare_quickthought.py \
-    --input-reference input_reference \
-    --output /mnt/out_quickthought_128 \
-    --model-name google_en_uncased_bert_base \
-    --max-seq-length 128 --dupe-factor 5
-```
+set -k
+# Get the data from S3
+aws s3 sync s3://mstar-data/ner-utf8 ner-utf8
 
-```bash
-python3 -m torch.distributed.launch --nproc_per_node=8 run_pretraining.py \
-  --model_name google_en_uncased_bert_base \
-  --lr 2e-4 \
-  --log_interval 100 \
-  --batch_size 256 \
-  --num_accumulated 1 \
-  --num_dataloader_workers 4 \
-  --num_steps 225000 \
-  --input-files /mnt/out_quickthought_128/*feather \
-  --mmap-folder /mnt/mstar_mmap \
-  --ckpt_dir /mnt/ckpt_dir \
-  --ckpt_interval 1000 2>&1| tee train.log;
-```
+# Generate the label vocabulary
+find ./ner-utf8 -name 'train.txt' -exec cat {} \; | sed "/^$/d" | awk '{print $NF}' | sort | uniq > label_vocab
 
-3. Phase 2 training with sequence length 512 (~20min + ~12 hours)
-
-```bash
-python3 prepare_quickthought.py \
-    --input-reference input_reference \
-    --output /mnt/out_quickthought_512 \
-    --model-name google_en_uncased_bert_base \
-    --max-seq-length 512 --dupe-factor 5
-```
-
-```bash
-python3 -m torch.distributed.launch --nproc_per_node=8 run_pretraining.py \
-  --model_name google_en_uncased_bert_base \
-  --lr 2e-4 \
-  --log_interval 100 \
-  --batch_size 32 \
-  --num_accumulated 4 \
-  --num_dataloader_workers 4 \
-  --num_steps 25000 \
-  --start_step 225000 \
-  --phase2 \
-  --phase1_num_steps 225000 \
-  --input-files /mnt/out_quickthought_512/*feather \
-  --mmap-folder /mnt/mstar_mmap \
-  --ckpt_dir /mnt/ckpt_dir | tee train.log;
-```
-
-Finally we obtain a folder of structure as followed,
-
-```
-google_en_uncased_bert_base
-├── vocab-{short_hash}.json
-├── model-{short_hash}.params
-├── model-{short_hash}.yml
-```
-
-
-# Sequence Tagging Data
-
-To generate the label vocabulary, run this command in the outermost data directory. 
-```bash
-find ./ -name 'train.txt' -exec cat {} \; | sed "/^$/d" | awk '{print $NF}' | sort | uniq > label_vocab
-```
-
-To create the batches run the following command:
-```bash
+# Create the batches for phase 1 pre-training
 python3 prepare_seqtagging.py \
-    --input-directory <path_to_input_directory> \
-    --label-vocab <path_to_label_vocab> \
-    --output-directory <path_to_output_directory> \
-    --model-name google_en_uncased_bert_base \
-    --max-seq-length 128 --dupe-factor 5
+    --input-directory ./ner-utf8 \
+    --label-vocab label_vocab \
+    --output-directory ./ner_processed \
+    --max-seq-length 128 --dupe-factor 50
+
+# Copy the training files
+mkdir ner_feather
+find ner_processed -name 'train*feather' | xargs -I'{}' cp '{}' ner_feather   
+```
+
+To create the batches for phase 2 pre-training, change `--max-seq-length` to 512.
+
+
+# Pre-training
+
+
+```bash
+python3 ./run_pretraining.py --trainer.gpus 8 --trainer.plugin ddp_sharded --trainer.max_steps 225000 --data.qt_dir /mnt/cc100_feather --data.ner_dir ner_feather --data.batch_size 128 --data.mmap_folder /mnt/mstar_mmap/ --trainer.replace_sampler_ddp=False --seed 1  --trainer.default_root_dir /mnt/default_root_dir --trainer.precision 16
+```
+
+
+# Appendix: Splitting the CC-100
+
+
+```bash
+set -k
+
+# Obtain relevant lanugage splits from CC-100
+aws s3 sync --exclude="*" --include en.txt.xz --include de.txt.xz --include fr.txt.xz --include ko.txt.xz --include ja.txt.xz --include es.txt.xz --include pt.txt.xz --include zh-Hans.txt.xz --include th.txt.xz --include it.txt.xz --include ar.txt.xz --include zh-Hant.txt.xz --include ca.txt.xz --include hi.txt.xz s3://mstar-data/cc100.txt.xz /mnt/cc100.txt.xz
+
+# Unpack
+cd /mnt/cc100.txt.xz
+ls {en,de,fr,ko,ja,es,pt,zh-Hans,th,it,ar,zh-Hant,ca,hi}*.txt.xz | xargs -P0 -n1 xz -d
+
+# Split files into smaller chunks, compress and store on S3
+cat <<EOF >> langs
+en
+de
+fr
+ko
+ja
+es
+pt
+zh-Hans
+th
+it
+ar
+zh-Hant
+ca
+hi
+EOF
+cat langs | xargs -P0 -n1 -I'{}' split -l 10000000 -d -a3 '{}'.txt '{}'/'{}'.txt.
+ls */*txt* | xargs -P$(nproc) -n1 zstd -T1 -1
+aws s3 sync --exclude="*" --include="*zst" /mnt/cc100 s3://mstar-data/cc100.txt.split.zst
 ```

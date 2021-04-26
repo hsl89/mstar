@@ -5,3 +5,5 @@
 !/.git
 !/tools/cc100/count_job.sh
 !/tools/cc100/count_tokens.py
+!/scripts/bert/prepare_quickthought.py
+!/scripts/bert/batch/job.sh
