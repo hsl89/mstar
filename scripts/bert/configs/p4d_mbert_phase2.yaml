@@ -1,0 +1,119 @@
+export_to_mxnet: false
+seed_everything: 1
+bf16: false
+trainer:
+  logger: true
+  checkpoint_callback: true
+  callbacks:
+    - class_path: pytorch_lightning.callbacks.ModelCheckpoint
+      init_args:
+        every_n_train_steps: 10000
+    - class_path: mstar.utils.lightning.AWSBatchProgressBar
+      init_args:
+        refresh_rate: 25
+  default_root_dir: $MSTAR_DEFAULT_ROOT_DIR
+  gradient_clip_val: 1
+  gradient_clip_algorithm: norm
+  process_position: 0
+  num_nodes: 1
+  num_processes: 1
+  gpus: 8
+  auto_select_gpus: false
+  tpu_cores: null
+  log_gpu_memory: null
+  progress_bar_refresh_rate: null
+  overfit_batches: 0.0
+  track_grad_norm: -1
+  check_val_every_n_epoch: 1
+  fast_dev_run: false
+  accumulate_grad_batches: 1
+  max_epochs: null
+  min_epochs: null
+  max_steps: 100000
+  min_steps: null
+  max_time: null
+  limit_train_batches: 1.0
+  limit_val_batches: 1.0
+  limit_test_batches: 1.0
+  limit_predict_batches: 1.0
+  val_check_interval: 1000
+  flush_logs_every_n_steps: 100
+  log_every_n_steps: 50
+  accelerator: deepspeed
+  sync_batchnorm: false
+  precision: 16
+  weights_summary: top
+  weights_save_path: null
+  num_sanity_val_steps: 2
+  truncated_bptt_steps: null
+  resume_from_checkpoint: null
+  profiler: null
+  benchmark: false
+  deterministic: false
+  reload_dataloaders_every_epoch: false
+  auto_lr_find: false
+  replace_sampler_ddp: true
+  terminate_on_nan: true
+  auto_scale_batch_size: false
+  prepare_data_per_node: true
+  plugins:
+    - class_path: pytorch_lightning.plugins.training_type.DeepSpeedPlugin
+      init_args:
+        zero_optimization: true
+        stage: 2
+        num_nodes: 1
+        contiguous_gradients: false
+        logging_batch_size_per_gpu: 128
+    - class_path: mstar.utils.lightning.AWSBatchEnvironment
+      init_args:
+        master_port: 1337
+  amp_backend: native
+  amp_level: O2
+  distributed_backend: null
+  move_metrics_to_cpu: false
+  multiple_trainloader_mode: max_size_cycle
+  stochastic_weight_avg: false
+model:
+  bert_cfg:
+    vocab_size: 119547
+    units: 768
+    hidden_size: 3072
+    max_length: 512
+    num_heads: 12
+    num_layers: 12
+    pos_embed_type: learned
+    activation: gelu
+    pre_norm: true
+    layer_norm_eps: 1e-5
+    num_token_types: 2
+    hidden_dropout_prob: 0.1
+    attention_dropout_prob: 0.1
+    layout: NT
+    compute_layout: auto
+  optimizer_cfg:
+    optimizer: adamw
+    weight_decay: 0.01
+    betas:
+    - 0.9
+    - 0.999
+    base_batch_size: 256
+    base_learning_rate: 1e-4
+    base_warmup_ratio: 0.0015625
+  ner_cfg:
+    vocab_size: 81
+  base_max_steps: 100000
+  single_task_mode: true
+  phase1_ckpt_path: phase1.ckpt
+data:
+  mlm_cfg:
+    subsample: false
+    bucket: mstar-data
+    prefix: wiki-deepinsight-processed-upsampled
+    pattern: '*/part*.txt.gz'
+    max_seq_length: 512
+    mlm_probability: 0.15
+    batch_size: 16
+  num_workers: 0
+  prefetch_factor: 2
+  ner_dir: './ner_feather'
+  single_task_mode: true

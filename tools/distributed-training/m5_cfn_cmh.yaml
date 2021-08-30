@@ -1,0 +1,464 @@
+Description: m5 mstar dev infra
+Parameters:
+  LatestEcsGpuAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ecs/optimized-ami/amazon-linux-2/gpu/recommended/image_id'
+
+Resources:
+  ################################################################################
+  # S3 Bucket for temporary files
+  ################################################################################
+  S3DevBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3DevBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: mstar-team
+          Effect: Allow
+          Principal:
+            AWS: arn:aws:iam::216212465934:root
+          Action: s3:*
+          Resource:
+          - !GetAtt S3DevBucket.Arn
+          - !Join
+            - ''
+            - [ !GetAtt S3DevBucket.Arn, '/*' ]
+
+  S3DevBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-dev'
+
+  ################################################################################
+  # Container Repository for AWS Batch
+  ################################################################################
+  ECR:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryPolicyText: |
+        {
+          "Version": "2008-10-17",
+          "Statement": [
+            {
+              "Sid": "AllowPushPull",
+              "Effect": "Allow",
+              "Principal": {
+                  "AWS": "arn:aws:iam::216212465934:root"
+              },
+              "Action": [
+                  "ecr:GetDownloadUrlForLayer",
+                  "ecr:BatchGetImage",
+                  "ecr:BatchCheckLayerAvailability",
+                  "ecr:PutImage",
+                  "ecr:InitiateLayerUpload",
+                  "ecr:UploadLayerPart",
+                  "ecr:CompleteLayerUpload"
+              ]
+            }
+          ]
+        }
+
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+            {
+              "rulePriority": 1,
+              "description": "Only keep 3 images",
+              "selection": {
+                "tagStatus": "any",
+                "countType": "imageCountMoreThan",
+                "countNumber": 3
+              },
+              "action": { "type": "expire" }
+            }]
+          }
+      RepositoryName: { Ref: "AWS::StackName" }
+
+  ################################################################################
+  # Network configuration for AWS Batch
+  ################################################################################
+  BatchVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+  # IPv6 enabled VPC is needed for task networking without NAT Gateways for AWS
+  # Batch Multi-Node jobs. See "Using a VPC in dual-stack mode" at
+  # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-networking.html
+  BatchVpcCidrBlockIpv6:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      VpcId: !Ref BatchVPC
+      AmazonProvidedIpv6CidrBlock: true
+  # Public subnets
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref BatchVPC
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref BatchVPC
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref BatchVPC
+  NatEip:
+     Type: AWS::EC2::EIP
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEip.AllocationId
+      SubnetId: !Ref PublicSubnetA
+  NatRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+      RouteTableId: !Ref RouteTable
+  InternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref PublicRouteTable
+  InternetIPv6Route:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      DestinationIpv6CidrBlock: '::/0'
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-2b
+      CidrBlock: 10.0.100.0/24
+  IPv6SubnetA:
+    Type: AWS::EC2::Subnet
+    DependsOn: BatchVpcCidrBlockIpv6
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-2b
+      CidrBlock: 10.0.0.0/24
+      Ipv6CidrBlock: !Select [0, !Cidr [!Select [0, !GetAtt 'BatchVPC.Ipv6CidrBlocks'], 256, 64]]
+      # "AWS Batch multi-node parallel jobs use the Amazon ECS awsvpc network
+      # mode, which gives your multi-node parallel job containers the same
+      # networking properties as Amazon EC2 instances. Each multi-node parallel
+      # job container gets its own elastic network interface, a primary private
+      # IP address, and an internal DNS hostname. The network interface is
+      # created in the same VPC subnet as its host compute resource." ->
+      # Therefore AssignIpv6AddressOnCreation: true to ensure they also get a
+      # IPv6 address
+      AssignIpv6AddressOnCreation: true
+  IPv6SubnetB:
+    Type: AWS::EC2::Subnet
+    DependsOn: BatchVpcCidrBlockIpv6
+    Properties:
+      VpcId: !Ref BatchVPC
+      AvailabilityZone: us-east-2b
+      CidrBlock: 10.0.1.0/24
+      Ipv6CidrBlock: !Select [1, !Cidr [!Select [0, !GetAtt 'BatchVPC.Ipv6CidrBlocks'], 256, 64]]
+      AssignIpv6AddressOnCreation: true
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetA
+  IPv6SubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref IPv6SubnetA
+  IPv6SubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref IPv6SubnetB
+  BatchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'AWS-Batch-${AWS::StackName}'
+      VpcId: !Ref BatchVPC
+  BatchIpv4Ingress:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    DependsOn: BatchSecurityGroup
+    Properties:
+      Description: Allow IPv4 traffic
+      GroupId: !Ref BatchSecurityGroup
+      IpProtocol: -1
+      CidrIp: 0.0.0.0/0
+  BatchIpv4Egress:
+    Type: "AWS::EC2::SecurityGroupEgress"
+    DependsOn: BatchSecurityGroup
+    Properties:
+      Description: Allow IPv4 traffic
+      GroupId: !Ref BatchSecurityGroup
+      IpProtocol: "-1"
+      CidrIp: 0.0.0.0/0
+  BatchIpv6Ingress:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    DependsOn: BatchSecurityGroup
+    Properties:
+      Description: Allow IPv6 traffic
+      GroupId: !Ref BatchSecurityGroup
+      IpProtocol: -1
+      CidrIpv6: "::/0"
+  BatchIpv6Egress:
+    Type: "AWS::EC2::SecurityGroupEgress"
+    DependsOn: BatchSecurityGroup
+    Properties:
+      Description: Allow IPv6 traffic
+      GroupId: !Ref BatchSecurityGroup
+      IpProtocol: "-1"
+      CidrIpv6: "::/0"
+  BatchEfaIngress:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    DependsOn: BatchSecurityGroup
+    Properties:
+      Description: Allow EFA communication
+      GroupId: !Ref BatchSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref BatchSecurityGroup
+  BatchEfaEgress:
+    Type: "AWS::EC2::SecurityGroupEgress"
+    DependsOn: BatchSecurityGroup
+    Properties:
+      Description: Allow EFA communication
+      DestinationSecurityGroupId: !Ref BatchSecurityGroup
+      GroupId: !Ref BatchSecurityGroup
+      IpProtocol: "-1"
+
+  ################################################################################
+  # Roles for AWS Batch
+  ################################################################################
+  BatchServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - 'batch.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole'
+  BatchJobRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - 'ecs-tasks.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+      - PolicyName: BucketAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action: [ 's3:ListBucket', 's3:ListObjects', 's3:GetObject', 's3:PutObject' ]
+              Resource: [ !GetAtt S3DevBucket.Arn, !Sub '${S3DevBucket.Arn}/*' ]
+            - Effect: Allow
+              Action: [ 's3:ListBucket', 's3:ListObjects', 's3:GetObject' ]
+              Resource: [ "arn:aws:s3:::mstar-data","arn:aws:s3:::mstar-data/*" ]
+      - PolicyName: EcsExec
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action: ["ssmmessages:CreateControlChannel", "ssmmessages:CreateDataChannel", "ssmmessages:OpenControlChannel", "ssmmessages:OpenDataChannel"]
+              Resource: [ '*' ]
+  EcsInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Service: "ec2.amazonaws.com"
+          Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role'
+  EcsInstanceProfile:
+    DependsOn: EcsInstanceRole
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+      - Ref: EcsInstanceRole
+
+  ################################################################################
+  # Instance configuration
+  ################################################################################
+  P4PlacementGroupB:
+   Type: AWS::EC2::PlacementGroup
+   Properties:
+     Strategy: cluster
+
+  P4LaunchTemplateB:
+    Type: "AWS::EC2::LaunchTemplate"
+    Properties:
+      LaunchTemplateData:
+        Monitoring:
+          Enabled: true
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              DeleteOnTermination: true
+              VolumeSize: 128
+              VolumeType: gp3
+        ImageId: !Ref LatestEcsGpuAmiId
+        InstanceType: p4d.24xlarge
+        InstanceInitiatedShutdownBehavior: terminate
+        KeyName: lausen
+        NetworkInterfaces:
+          - Description: EFA0
+            NetworkCardIndex: 0
+            DeviceIndex: 0
+            DeleteOnTermination: true
+            SubnetId: !Ref IPv6SubnetB
+            Groups:
+              - !Ref BatchSecurityGroup
+            InterfaceType: efa
+          - Description: EFA1
+            NetworkCardIndex: 1
+            DeviceIndex: 1
+            DeleteOnTermination: true
+            SubnetId: !Ref IPv6SubnetB
+            Groups:
+              - !Ref BatchSecurityGroup
+            InterfaceType: efa
+          - Description: EFA2
+            NetworkCardIndex: 2
+            DeviceIndex: 2
+            DeleteOnTermination: true
+            SubnetId: !Ref IPv6SubnetB
+            Groups:
+              - !Ref BatchSecurityGroup
+            InterfaceType: efa
+          - Description: EFA3
+            NetworkCardIndex: 3
+            DeviceIndex: 3
+            DeleteOnTermination: true
+            SubnetId: !Ref IPv6SubnetB
+            Groups:
+              - !Ref BatchSecurityGroup
+            InterfaceType: efa
+        MetadataOptions:
+          "HttpPutResponseHopLimit": 2
+        UserData: !Base64 |
+          MIME-Version: 1.0
+          Content-Type: multipart/mixed; boundary="==MYBOUNDARY=="
+
+          --==MYBOUNDARY==
+
+          Content-Type: text/x-shellscript; charset="us-ascii"
+          #!/bin/bash
+          sudo sysctl -w vm.nr_hugepages=5128
+          sudo yum update -y
+          curl -O https://efa-installer.amazonaws.com/aws-efa-installer-latest.tar.gz
+          tar -xf aws-efa-installer-latest.tar.gz
+          cd aws-efa-installer
+          sudo ./efa_installer.sh -y -g -m
+
+          --==MYBOUNDARY==--
+
+  ################################################################################
+  # AWS Batch
+  ################################################################################
+  BatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/${AWS::StackName}/log'
+
+  # Managed multi-node parallel environment
+  P4dBatchComputeEnvironmentB:
+    Type: AWS::Batch::ComputeEnvironment
+    DependsOn: P4LaunchTemplateB
+    Properties:
+      Type: MANAGED
+      ServiceRole: !GetAtt BatchServiceRole.Arn
+      ComputeResources:
+        MaxvCpus: 1536  # 96 vCPUs per p4d
+        MinvCpus: 0  # MinvCpus, DesiredvCpus 0 to avoid use of (unsupported) AutoScalingGroup
+        PlacementGroup: !Ref P4PlacementGroupB
+        Type: EC2
+        AllocationStrategy: BEST_FIT
+        InstanceRole: !Ref EcsInstanceProfile
+        LaunchTemplate:
+          LaunchTemplateId: !Ref P4LaunchTemplateB
+          Version: "$Latest"  # Not updated after ComputeEnvironment creation
+        InstanceTypes: [ p4d.24xlarge ]
+        Tags: {"Name" : "Batch Instance - P4OnDemand"}
+        Subnets: [ !Ref IPv6SubnetB ]
+      State: ENABLED
+
+  P4BatchJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      JobQueueName: !Sub '${AWS::StackName}-p4'
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - ComputeEnvironment: !Ref P4dBatchComputeEnvironmentB
+          Order: 1
+
+  P4BatchJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: multinode
+      JobDefinitionName: !Sub '${AWS::StackName}-p4'
+      Timeout:
+        AttemptDurationSeconds: 604800  # 7 days
+      NodeProperties:
+        MainNode: 0  # Index of main node
+        NumNodes: 2
+        NodeRangeProperties:
+          - TargetNodes: "0:"  # All nodes
+            Container:
+              Command: ["echo", "hello world"]
+              Image: !Sub
+                - "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ECR}:latest"
+                - { ECR: !Ref ECR}
+              InstanceType: p4d.24xlarge
+              JobRoleArn: !GetAtt BatchJobRole.Arn
+              LinuxParameters:
+                SharedMemorySize: 100000  # For nccl
+                Devices:
+                  - HostPath: "/dev/infiniband/uverbs0"
+                  - HostPath: "/dev/infiniband/uverbs1"
+                  - HostPath: "/dev/infiniband/uverbs2"
+                  - HostPath: "/dev/infiniband/uverbs3"
+              Ulimits:
+                - Name: memlock
+                  HardLimit: -1
+                  SoftLimit: -1
+              ResourceRequirements:
+                - Type: GPU
+                  Value: 8
+              Vcpus: 96
+              Memory: 1090000  # out of 1098633
+              LogConfiguration:
+                LogDriver: awslogs
+                Options:
+                  "awslogs-group": !Ref BatchLogGroup

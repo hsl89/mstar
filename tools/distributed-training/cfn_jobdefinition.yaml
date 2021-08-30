@@ -1,0 +1,73 @@
+Description: CFN for Cluster JobDefinition
+Parameters:
+  User:
+    Type: String
+    Description: Amazon alias of user
+  ClusterStackName:
+    Type: String
+    Description: CloudFormation StackName defining the cluster environment
+  LogRetentionInDays:
+    Type: Number
+    Description: CloudWatch Log Retention
+    Default: 365
+
+
+Resources:
+  BatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/${ClusterStackName}-${User}-p4/log'
+      RetentionInDays: !Ref LogRetentionInDays
+
+  P4JobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: multinode
+      JobDefinitionName: !Sub '${ClusterStackName}-${User}-p4'
+      Timeout:
+        AttemptDurationSeconds: 604800  # 7 days
+      NodeProperties:
+        MainNode: 0  # Index of main node
+        NumNodes: 2
+        NodeRangeProperties:
+          - TargetNodes: "0:"  # All nodes
+            Container:
+              Command: ["echo", "hello world"]
+              Image: !Sub
+                - "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ECR}:${User}"
+                - User: !Ref User
+                  ECR:
+                    Fn::ImportValue:
+                      !Sub '${ClusterStackName}-ECR'
+              InstanceType: p4d.24xlarge
+              JobRoleArn:
+                Fn::ImportValue:
+                  !Sub '${ClusterStackName}-BatchJobRoleArn'
+              LinuxParameters:
+                SharedMemorySize: 100000  # For nccl
+                Devices:
+                  - HostPath: "/dev/infiniband/uverbs0"
+                  - HostPath: "/dev/infiniband/uverbs1"
+                  - HostPath: "/dev/infiniband/uverbs2"
+                  - HostPath: "/dev/infiniband/uverbs3"
+              Ulimits:
+                - Name: memlock
+                  HardLimit: -1
+                  SoftLimit: -1
+              ResourceRequirements:
+                - Type: GPU
+                  Value: 8
+              Volumes:
+                - Name: fsx
+                  Host:
+                    SourcePath: /fsx
+              MountPoints:
+                - SourceVolume: fsx
+                  ContainerPath: /mnt
+                  ReadOnly: true
+              Vcpus: 96
+              Memory: 1090000  # out of 1098633
+              LogConfiguration:
+                LogDriver: awslogs
+                Options:
+                  "awslogs-group": !Ref BatchLogGroup

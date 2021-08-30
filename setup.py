@@ -31,6 +31,8 @@ if VERSION.endswith('dev'):
 
 requirements = [
     'boto3',
+    's3fs',
+    'smart_open',
     'h5py>=2.10.0',
     'yacs>=0.1.8',
     'sentencepiece',
@@ -39,17 +41,20 @@ requirements = [
     'requests',
     'pyarrow>=3',
     'transformers>=4.3.0',
+    'tokenizers>=0.10.2',  # 0.10.1 is buggy
     'tensorboard',
     'pandas',
     'contextvars;python_version<"3.7"',  # Contextvars for python <= 3.6
     'dataclasses;python_version<"3.7"',  # Dataclass for python <= 3.6
     'pickle5;python_version<"3.8"',  # pickle protocol 5 for python <= 3.8
     'graphviz',
-    'pytorch-lightning@git+https://github.com/PyTorchLightning/pytorch-lightning#3cc0b2c063e7d9f172f8060a626f883cca1bae93',
-    'jsonargparse[signatures]',
-    'torchmetrics',
+    # We can also use patched pytorch-lightning branch to add bfloat16 training support
+    'pytorch-lightning>=0.4',
+    'jsonargparse[signatures]@git+https://github.com/leezu/jsonargparse@cf8a40fe2a2d91542d1b2798f065be327f29fcad',  # v3.19 + workaround for https://github.com/PyTorchLightning/pytorch-lightning/issues/9207
+    'torchmetrics@git+https://github.com/leezu/metrics@d9ad0ac1ee875cc410fd21b49804b65d592459e3',  # v0.5 + workaround for https://github.com/PyTorchLightning/metrics/issues/484
     'fairscale',
     'asttokens',
+    'psutil',
 ]
 
 force_cuda = os.getenv("FORCE_CUDA", "0") == "1"

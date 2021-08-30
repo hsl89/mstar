@@ -253,7 +253,8 @@ def process_file(path_pair):
         buffers = [[] for _ in range(len(schema))]
 
     batch_tbl = pa.Table.from_batches(pa_batches, schema=schema)
-    pa.feather.write_feather(batch_tbl, output_file + ".feather")
+    pa.feather.write_feather(batch_tbl, output_file + ".feather",
+                             compression="uncompressed")
 
 
 def process_file_paths(args):
@@ -326,7 +327,7 @@ def main():
         convention refers to the function executed during map.
 
         """
-        tokenizer = AutoTokenizer.from_pretrained('facebook/mbart-large-cc25')
+        tokenizer = AutoTokenizer.from_pretrained('bert-base-multilingual-cased')
         function.tokenizer = tokenizer
         function.args = args
         function.mask_id = tokenizer.vocab[tokenizer.mask_token]
