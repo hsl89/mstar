@@ -36,8 +36,7 @@ def to_torch_dtype(dtype):
     dtype = np.dtype(dtype)
     if dtype in numpy_to_torch_dtype_dict:
         return numpy_to_torch_dtype_dict[dtype]
-    else:
-        raise KeyError(f'dtype = {dtype} is not supported for conversion')
+    raise KeyError(f'dtype = {dtype} is not supported for conversion')
 
 
 def to_numpy_dtype(dtype):
@@ -57,8 +56,7 @@ def to_numpy_dtype(dtype):
         return None
     if dtype in torch_dtype_to_numpy_dict:
         return torch_dtype_to_numpy_dict[dtype]
-    else:
-        return np.dtype(dtype)
+    return np.dtype(dtype)
 
 
 def share_parameters(source, target):
@@ -79,6 +77,8 @@ def share_parameters(source, target):
     source : nn.Module
     target : nn.Module
     """
+
+    # pylint: disable=protected-access
     def _named_members(module, get_members_fn, prefix='', recurse=True):
         r"""Helper method for yielding various names + members of modules.
 
@@ -88,8 +88,8 @@ def share_parameters(source, target):
 
         """
         modules = module.named_modules(prefix=prefix) if recurse else [(prefix, module)]
-        for module_prefix, module in modules:
-            members = get_members_fn(module)
+        for module_prefix, mod in modules:
+            members = get_members_fn(mod)
             for k, v in members:
                 if v is None:
                     continue
@@ -131,17 +131,16 @@ def move_to(obj, device=None):
     """
     if th.is_tensor(obj):
         return obj.to(device)
-    elif isinstance(obj, dict):
+    if isinstance(obj, dict):
         res = {}
         for k, v in obj.items():
             res[k] = move_to(v, device)
         return res
-    elif isinstance(obj, (list, tuple)):
+    if isinstance(obj, (list, tuple)):
         res = []
         for v in obj:
             res.append(move_to(v, device))
         if isinstance(obj, tuple):
             res = tuple(res)
         return res
-    else:
-        raise TypeError("Invalid type for move_to")
+    raise TypeError("Invalid type for move_to")

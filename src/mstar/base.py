@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# pylint: disable=abstract-method
 """Helper functions."""
 
 import os

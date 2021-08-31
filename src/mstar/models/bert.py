@@ -33,7 +33,7 @@ import torch as th
 
 from ..attention_cell import gen_self_attn_mask
 from ..layers import get_activation, sequence_mask
-from ..utils.config import CfgNode as CN
+from ..utils.config import CfgNode
 from ..utils.registry import Registry
 from .transformer import TransformerEncoderLayer
 
@@ -42,9 +42,9 @@ bert_cfg_reg = Registry('bert_cfg')
 
 @bert_cfg_reg.register()
 def google_en_uncased_bert_base():
-    cfg = CN()
+    cfg = CfgNode()
     # Parameters for thr small model
-    cfg.MODEL = CN()
+    cfg.MODEL = CfgNode()
     cfg.MODEL.vocab_size = 30522
     cfg.MODEL.units = 768
     cfg.MODEL.hidden_size = 3072
@@ -61,7 +61,7 @@ def google_en_uncased_bert_base():
     cfg.MODEL.layout = 'NT'
     cfg.MODEL.compute_layout = 'auto'
     # Hyper-parameters of the Initializers
-    cfg.INITIALIZER = CN()
+    cfg.INITIALIZER = CfgNode()
     cfg.INITIALIZER.embed = ['truncnorm', 0, 0.02]
     cfg.INITIALIZER.weight = ['truncnorm', 0, 0.02]  # TruncNorm(0, 0.02)
     cfg.INITIALIZER.bias = ['zeros']
@@ -73,6 +73,7 @@ def google_en_uncased_bert_base():
 
 
 class BertTransformer(th.nn.Module):
+    # pylint: disable=too-many-arguments
     def __init__(self, units: int = 512, hidden_size: int = 2048, num_layers: int = 6,
                  num_heads: int = 8, attention_dropout_prob: float = 0.,
                  hidden_dropout_prob: float = 0., output_attention: bool = False,
@@ -126,10 +127,7 @@ class BertTransformer(th.nn.Module):
             - layout = 'TN'
                 Shape (seq_length, batch_size, C_out)
         """
-        if self.layout == 'NT':
-            time_axis, batch_axis = 1, 0
-        else:
-            time_axis, batch_axis = 0, 1
+        time_axis = self.layout.find('T')
         # 1. Embed the data
         attn_mask = gen_self_attn_mask(data, valid_length, attn_type='full', layout=self.layout)
         out = data
@@ -151,11 +149,11 @@ class BertTransformer(th.nn.Module):
             # if self._output_all_encodings, SequenceMask is already applied above
             out = sequence_mask(out, valid_len=valid_length, axis=time_axis)
             return out, additional_outputs
-        else:
-            return all_encodings_outputs, additional_outputs
+        return all_encodings_outputs, additional_outputs
 
 
 class BertModel(th.nn.Module):
+    # pylint: disable=too-many-arguments, too-many-locals
     def __init__(self, vocab_size=30000, units=768, hidden_size=3072, num_layers=12, num_heads=12,
                  max_length=512, hidden_dropout_prob=0., attention_dropout_prob=0.,
                  num_token_types=2, pos_embed_type='learned', activation='gelu',
@@ -198,7 +196,6 @@ class BertModel(th.nn.Module):
         return self._layout
 
     def forward(self, inputs, token_types, valid_length):
-        # pylint: disable=arguments-differ
         """Generate the representation given the inputs.
 
         This is used in training or fine-tuning a bert model.
@@ -239,11 +236,11 @@ class BertModel(th.nn.Module):
         outputs = []
         if self._compute_layout != self._layout:
             # Swap the axes if the compute_layout and layout mismatch
-            contextual_embeddings, additional_outputs = self.encoder(th.transpose(prev_out, 0, 1),
-                                                                     valid_length)
+            contextual_embeddings, _ = self.encoder(th.transpose(prev_out, 0, 1),
+                                                    valid_length)
             contextual_embeddings = th.transpose(contextual_embeddings, 0, 1)
         else:
-            contextual_embeddings, additional_outputs = self.encoder(prev_out, valid_length)
+            contextual_embeddings, _ = self.encoder(prev_out, valid_length)
         outputs.append(contextual_embeddings)
         if self.use_pooler:
             pooled_out = self.apply_pooling(contextual_embeddings)
@@ -317,10 +314,8 @@ class BertModel(th.nn.Module):
 
     @staticmethod
     def get_cfg(key=None):
-        if key is not None:
-            return bert_cfg_reg.create(key)
-        else:
-            return bert_cfg_reg.create('google_en_uncased_bert_base')
+        key = 'google_en_uncased_bert_base' if key is None else key
+        return bert_cfg_reg.create(key)
 
     @classmethod
     def from_cfg(cls, cfg, use_pooler=True) -> 'BertModel':
@@ -597,12 +592,12 @@ class QTBertForPretrain(th.nn.Module):
 
 
 def init_weights(module):
-    if type(module) in (th.nn.Linear, th.nn.Embedding):
+    if isinstance(module, (th.nn.Linear, th.nn.Embedding)):
         th.nn.init.trunc_normal_(module.weight, mean=0, std=0.02, a=-0.04, b=0.04)
-        if type(module) == th.nn.Linear and module.bias is not None:
+        if isinstance(module, th.nn.Linear) and module.bias is not None:
             module.bias.data.zero_()
     elif isinstance(module, th.nn.LayerNorm):
         module.bias.data.zero_()
         module.weight.data.fill_(1.0)
     else:
-        logging.debug(f'Not performing custom initialization for {type(module)}')
+        logging.debug('Not performing custom initialization for %s', type(module))

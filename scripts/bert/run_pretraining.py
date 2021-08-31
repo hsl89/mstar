@@ -1,8 +1,6 @@
 """Pretraining on Code"""
-import fnmatch
 import functools
 import glob
-import itertools
 import logging
 import math
 import multiprocessing
@@ -10,15 +8,10 @@ import os
 import pathlib
 import random
 import sys
-import time
 import typing
-from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 
-import boto3
-import mstar
 import numpy as np
-import psutil
 import pyarrow as pa
 import pyarrow.compute
 import pyarrow.dataset
@@ -30,336 +23,11 @@ import transformers
 from numpy.testing import assert_allclose
 from pytorch_lightning.utilities.cli import LightningCLI
 from pytorch_lightning.utilities.cloud_io import load as pl_load
-from smart_open import open as smart_open
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from transformers import AutoTokenizer
 
-
-@dataclass
-class MLMDataConfig:
-    bucket: str = 'mstar-data'
-    prefix: str = 'wiki-20210401-processed-resampled'
-    pattern: str = '*/part*.txt.gz'
-    max_seq_length: int = 128
-    mlm_probability: float = 0.15
-    short_seq_probability: float = 0.1
-    batch_size: int = 8
-    eval_splits: int = 1
-    subsample: bool = False
-
-
-class DistributedMLMFromS3(th.utils.data.IterableDataset):
-    def __init__(self, mlm_cfg, infinite=True):
-        """Masked language modeling data from a set of text files on S3.
-
-        If torch distributed is initialized, the set of files is partitioned
-        among the ranks (unless validation=True). Thus, the number of files
-        must be greater or equal than the number of ranks. Validation files
-        specified via eval_splits are excluded.
-
-        Parameters
-        ----------
-        mlm_cfg : MLMDataConfig
-            Dataset configuration.
-        infinite : bool, default True
-            If True, DistributedMLMFromS3 is an infinite iterable. This is
-            useful to prevent gaps in multi-processing based prefetching.
-            Processed files are not cached and each re-processing will use a
-            separate random mask.
-
-        """
-        super().__init__()
-        client = boto3.client('s3')
-        object_list = client.list_objects(Bucket=mlm_cfg.bucket, Prefix=mlm_cfg.prefix)
-        object_keys = [obj['Key'] for obj in object_list['Contents']]
-        matched_keys = sorted(k for k in object_keys if fnmatch.fnmatch(k, mlm_cfg.pattern))
-        train, val = matched_keys[:-mlm_cfg.eval_splits], matched_keys[-mlm_cfg.eval_splits:]
-        self._num_cpus = os.cpu_count()
-        self._world_size = 1
-        self._global_rank = 0
-        if th.distributed.is_initialized():
-            self._num_cpus = math.ceil(os.cpu_count() / th.cuda.device_count())
-            self._global_rank = th.distributed.get_rank()
-            self._world_size = th.distributed.get_world_size()
-            assert self._world_size <= len(train)
-            train = train[self._global_rank::self._world_size]
-        self._train_shards = train
-        self._eval_shards = val
-        self._mlm_cfg = mlm_cfg
-        self._tokenizer = AutoTokenizer.from_pretrained('bert-base-multilingual-cased')
-        self._cls_idx = self._tokenizer.convert_tokens_to_ids(self._tokenizer.cls_token)
-        self._sep_idx = self._tokenizer.convert_tokens_to_ids(self._tokenizer.sep_token)
-        self._mask_idx = self._tokenizer.convert_tokens_to_ids(self._tokenizer.mask_token)
-        self._num_tokens = len(self._tokenizer)
-        self._infinite = infinite
-
-    def tokenize_file(self, shard):
-        # Limit #cpus used by hf/tokenizers CPUs for 20% wall time improvement
-        os.environ["RAYON_RS_NUM_CPUS"] = str(self._num_cpus)
-        if psutil.cpu_percent() > 90:  # Sleep if high CPU util
-            time.sleep(random.uniform(0, 2))
-        cfg = self._mlm_cfg
-        with smart_open(f's3://{cfg.bucket}/{shard}', 'r') as f:
-            all_documents = [[y for y in x.split() if y] for x in f.read().split('\n\n') if x]
-            if cfg.subsample:
-                all_documents = random.sample(all_documents, math.ceil(0.05 * len(all_documents)))
-            num_sentences = [len(p) for p in all_documents]
-            sentences = []
-            for doc in all_documents:
-                sentences.extend(doc)
-            sentences = [  # Tokenize
-                line.ids for line in self._tokenizer._tokenizer.encode_batch(
-                    sentences, add_special_tokens=False, is_pretokenized=False)
-            ]
-            all_documents = []
-            cnt = 0
-            for num_sent in num_sentences:
-                all_documents.append([s for s in sentences[cnt:cnt + num_sent] if s])
-                cnt += num_sent
-
-            toks, seg_ids, val_lengths, nsp_labels = [], [], [], []
-            for document_index in range(len(all_documents)):
-                document = all_documents[document_index]
-                # Account for [CLS], [SEP], [SEP]
-                max_num_tokens = cfg.max_seq_length - 3
-
-                # We *usually* want to fill up the entire sequence since we are padding
-                # to `max_seq_length` anyways, so short sequences are generally wasted
-                # computation. However, we *sometimes*
-                # (i.e., short_seq_prob == 0.1 == 10% of the time) want to use shorter
-                # sequences to minimize the mismatch between pre-training and fine-tuning.
-                # The `target_seq_length` is just a rough target however, whereas
-                # `max_seq_length` is a hard limit.
-                target_seq_length = max_num_tokens
-                if random.random() < cfg.short_seq_probability:
-                    target_seq_length = random.randint(2, max_num_tokens)
-
-                # We DON'T just concatenate all of the tokens from a document into a long
-                # sequence and choose an arbitrary split point because this would make the
-                # next sentence prediction task too easy. Instead, we split the input into
-                # segments "A" and "B" based on the actual "sentences" provided by the user
-                # input.
-                current_chunk = []
-                current_length = 0
-                i = 0
-                while i < len(document):
-                    segment = document[i]
-                    current_chunk.append(segment)
-                    current_length += len(segment)
-                    if i == len(document) - 1 or current_length >= target_seq_length:
-                        if current_chunk:
-                            # `a_end` is how many segments from `current_chunk` go into the `A`
-                            # (first) sentence.
-                            a_end = 1
-                            if len(current_chunk) >= 2:
-                                a_end = random.randint(1, len(current_chunk) - 1)
-
-                            tokens_a = []
-                            for j in range(a_end):
-                                tokens_a.extend(current_chunk[j])
-
-                            tokens_b = []
-                            # Random next
-                            is_random_next = False
-                            if len(current_chunk) == 1 or random.random() < 0.5:
-                                is_random_next = True
-                                target_b_length = target_seq_length - len(tokens_a)
-
-                                # This should rarely go for more than one iteration for large
-                                # corpora. However, just to be careful, we try to make sure that
-                                # the random document is not the same as the document
-                                # we're processing.
-                                for _ in range(10):
-                                    random_document_index = random.randint(
-                                        0,
-                                        len(all_documents) - 1)
-                                    if random_document_index != document_index:
-                                        break
-
-                                random_document = all_documents[random_document_index]
-                                random_start = random.randint(0, len(random_document) - 1)
-                                for j in range(random_start, len(random_document)):
-                                    tokens_b.extend(random_document[j])
-                                    if len(tokens_b) >= target_b_length:
-                                        break
-                                # We didn't actually use these segments so we "put them back" so
-                                # they don't go to waste.
-                                num_unused_segments = len(current_chunk) - a_end
-                                i -= num_unused_segments
-                            # Actual next
-                            else:
-                                is_random_next = False
-                                for j in range(a_end, len(current_chunk)):
-                                    tokens_b.extend(current_chunk[j])
-
-                            # truncate_seq_pair
-                            while True:
-                                total_length = len(tokens_a) + len(tokens_b)
-                                if total_length <= max_num_tokens:
-                                    break
-                                trunc_tokens = tokens_a if len(tokens_a) > len(
-                                    tokens_b) else tokens_b
-                                assert len(trunc_tokens) >= 1
-                                # We want to sometimes truncate from the front
-                                # and sometimes from the back to add more
-                                # randomness and avoid biases.
-                                if random.random() < 0.5:
-                                    del trunc_tokens[0]
-                                else:
-                                    trunc_tokens.pop()
-
-                            assert len(tokens_a) >= 1
-                            assert len(tokens_b) >= 1
-
-                            tokens = []
-                            segment_ids = []
-                            tokens.append(self._cls_idx)
-                            segment_ids.append(0)
-                            for token in tokens_a:
-                                tokens.append(token)
-                                segment_ids.append(0)
-
-                            tokens.append(self._sep_idx)
-                            segment_ids.append(0)
-
-                            for token in tokens_b:
-                                tokens.append(token)
-                                segment_ids.append(1)
-                            tokens.append(self._sep_idx)
-                            segment_ids.append(1)
-
-                            # Pad
-                            valid_length = len(tokens)
-                            if len(tokens) < cfg.max_seq_length:
-                                tokens.extend([0] * (cfg.max_seq_length - valid_length))
-                                segment_ids.extend([0] * (cfg.max_seq_length - valid_length))
-
-                            toks.append(tokens)
-                            seg_ids.append(segment_ids)
-                            val_lengths.append(valid_length)
-                            nsp_labels.append(is_random_next)
-                        current_chunk = []
-                        current_length = 0
-                    i += 1
-
-            inputs = th.as_tensor(toks)
-            segment_ids = th.as_tensor(seg_ids)
-            valid_length = th.as_tensor(val_lengths)
-            nsp_labels = th.as_tensor(nsp_labels).type(th.long)
-            labels = inputs.clone()
-            probability_matrix = th.full(labels.shape, cfg.mlm_probability)
-            special_tokens_mask = (inputs == self._cls_idx) | (inputs == self._sep_idx)
-            probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
-            masked_indices = th.bernoulli(probability_matrix).bool()
-
-            # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
-            indices_replaced = th.bernoulli(th.full(labels.shape, 0.8)).bool() & masked_indices
-            inputs[indices_replaced] = self._mask_idx
-            # 10% of the time, we replace masked input tokens with random word
-            indices_random = (th.bernoulli(th.full(labels.shape, 0.5)).bool() & masked_indices
-                              & ~indices_replaced)
-            random_words = th.randint(self._num_tokens, labels.shape, dtype=th.long)
-            inputs[indices_random] = random_words[indices_random]
-            # The rest of the time (10% of the time) we keep the masked input tokens unchanged
-
-            return inputs, labels, masked_indices, segment_ids, valid_length, nsp_labels
-
-    def __iter__(self):
-        ex = mstar.utils.executors.LazyProcessPoolExecutor(max_workers=1)
-        worker_info = th.utils.data.get_worker_info()
-        worker_id = worker_info.id if worker_info is not None else 0
-        num_workers = worker_info.num_workers if worker_info is not None else 1
-        shards = self._train_shards[worker_id::num_workers]
-        if self._infinite:
-            # Enable pre-fetching accross epoch boundaries; 50% wall time
-            # reduction if world_size ≈ len(self._train_shards)
-            shards = itertools.cycle(shards)
-        # Executor prefetches max_workers+prefetch items
-        processed = ex.map(self.tokenize_file, shards, prefetch=1)
-        cfg = self._mlm_cfg
-        for shard in processed:
-            if shard is None:
-                continue
-            inputs, labels, masked_indices, segment_ids, valid_length, nsp_labels = shard
-            assert len(inputs.shape) == 2
-            indices = th.randperm(inputs.shape[0])
-            for i in range(inputs.shape[0] // cfg.batch_size):
-                batch_indices = indices[i * cfg.batch_size:(i + 1) * cfg.batch_size]
-                batch_input_id = inputs[batch_indices]
-                batch_segment_id = segment_ids[batch_indices]
-                batch_valid_length = valid_length[batch_indices]
-                batch_mlm_positions = th.nonzero(masked_indices[batch_indices].flatten()).flatten()
-                batch_mlm_labels = labels[batch_indices][masked_indices[batch_indices]]
-                batch_nsp_labels = nsp_labels[batch_indices]
-                yield (batch_input_id, batch_segment_id, batch_valid_length, batch_mlm_positions,
-                       batch_mlm_labels, batch_nsp_labels)
-
-
-class DistributedEvalMLMFromS3(DistributedMLMFromS3):
-    def __init__(self, mlm_cfg):
-        """Masked language modeling data from a set of text files on S3.
-
-        Compared to DistributedMLMFromS3, this class
-        - Tokenizes all evaluation files eagerly, only once but on every rank.
-        - Partitions the tokenized samples across ranks
-        """
-        super().__init__(mlm_cfg, infinite=False)
-        self._toks = None
-        # Call hf/tokenizers in a separate process, to avoid "The current
-        # process just got forked, after parallelism has already been used.
-        # Disabling parallelism to avoid deadlocks..."
-        ex = ProcessPoolExecutor(max_workers=1)
-        if self._global_rank == 0:
-            tokenized = list(ex.map(self.tokenize_file, self._eval_shards))
-            self._toks = th.cat([labels for _, labels, _, _, _, _ in tokenized])
-            self._segment_ids = th.cat([segment_ids for _, _, _, segment_ids, _, _ in tokenized])
-            self._valid_lengths = th.cat([val_len for _, _, _, _, val_len, _ in tokenized])
-            if self._world_size > 1:
-                objects = [self._toks, self._segment_ids, self._valid_lengths]
-                th.distributed.broadcast_object_list(objects, src=0)
-        else:
-            objects = [None, None, None]
-            th.distributed.broadcast_object_list(objects, src=0)
-            self._toks, self._segment_ids, self._valid_lengths = objects
-
-    def __iter__(self):
-        cfg = self._mlm_cfg
-        worker_info = th.utils.data.get_worker_info()
-        worker_id = worker_info.id if worker_info is not None else 0
-        num_workers = worker_info.num_workers if worker_info is not None else 1
-        start = self._global_rank * num_workers + worker_id
-        end = (len(self._toks) // (self._world_size * num_workers)) * self._world_size * num_workers
-        step = self._world_size * num_workers
-        inputs = self._toks[start:end:step].clone()
-        segment_ids = self._segment_ids[start:end:step].clone()
-        valid_length = self._valid_lengths[start:end:step].clone()
-        labels = inputs.clone()
-        probability_matrix = th.full(labels.shape, cfg.mlm_probability)
-        special_tokens_mask = (inputs == self._cls_idx) | (inputs == self._sep_idx)
-        probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
-        masked_indices = th.bernoulli(probability_matrix).bool()
-        # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
-        indices_replaced = th.bernoulli(th.full(labels.shape, 0.8)).bool() & masked_indices
-        inputs[indices_replaced] = self._mask_idx
-        # 10% of the time, we replace masked input tokens with random word
-        indices_random = th.bernoulli(th.full(labels.shape,
-                                              0.5)).bool() & masked_indices & ~indices_replaced
-        random_words = th.randint(self._num_tokens, labels.shape, dtype=th.long)
-        inputs[indices_random] = random_words[indices_random]
-        # The rest of the time (10% of the time) we keep the masked input tokens unchanged
-
-        indices = th.arange(inputs.shape[0])
-        # Integer division with round up
-        for i in range((inputs.shape[0] + cfg.batch_size - 1) // cfg.batch_size):
-            batch_indices = indices[i * cfg.batch_size:(i + 1) * cfg.batch_size]
-            batch_input_id = inputs[batch_indices]
-            batch_segment_id = segment_ids[batch_indices]
-            batch_valid_length = valid_length[batch_indices]
-            batch_mlm_positions = th.nonzero(masked_indices[batch_indices].flatten()).flatten()
-            batch_mlm_labels = labels[batch_indices][masked_indices[batch_indices]]
-            yield (batch_input_id, batch_segment_id, batch_valid_length, batch_mlm_positions,
-                   batch_mlm_labels)
+import mstar
+from mstar.utils.data import MLMS3DataConfig
 
 
 def identity_collate(x):  # Can't pickle lambda on Py3.6
@@ -398,7 +66,8 @@ def ner_collate_fn(indices, *, tbl):
 
 
 class MultiTaskDataModule(pl.LightningDataModule):
-    def __init__(self, mlm_cfg: MLMDataConfig = MLMDataConfig(), ner_dir: str = "./ner_feather",
+    def __init__(self, mlm_cfg: MLMS3DataConfig = MLMS3DataConfig(),
+                 ner_dir: str = "./ner_feather",
                  num_workers=1, prefetch_factor=32, single_task_mode: bool = True):
         super().__init__()
         self.num_workers = num_workers
@@ -406,10 +75,12 @@ class MultiTaskDataModule(pl.LightningDataModule):
         self._mlm_cfg = mlm_cfg
         self._ner_dir = ner_dir
         self._single_task_mode = single_task_mode
+        self._train_paths, self._eval_paths = mstar.utils.data.get_train_and_eval_paths(mlm_cfg)
 
     def train_dataloader(self):
-        mlm_dataloader = DataLoader(DistributedMLMFromS3(self._mlm_cfg, infinite=True),
-                                    batch_size=1, collate_fn=identity_collate, pin_memory=True)
+        mlm_dataloader = DataLoader(
+            mstar.utils.data.DistributedMLM(self._train_paths, self._mlm_cfg, infinite=True),
+            batch_size=1, collate_fn=identity_collate, pin_memory=True)
         data = {'mlm': mlm_dataloader}
 
         if not self._single_task_mode:
@@ -436,8 +107,15 @@ class MultiTaskDataModule(pl.LightningDataModule):
         return data
 
     def val_dataloader(self):
-        mlm_loader = DataLoader(DistributedEvalMLMFromS3(self._mlm_cfg), batch_size=1,
-                                collate_fn=identity_collate, pin_memory=True)
+        cfg = MLMS3DataConfig()
+        cfg.replace(self._mlm_cfg)
+        cfg.use_nsp = False
+        mlm_loader = DataLoader(
+            mstar.utils.data.DistributedMLM(
+                self._eval_paths, cfg,
+                infinite=False, eager=True, shuffle=False, keep_last_batch=True),
+            batch_size=1,
+            collate_fn=identity_collate, pin_memory=True)
         return mlm_loader
 
     def test_dataloader(self):

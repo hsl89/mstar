@@ -1,22 +1,26 @@
 import argparse
+import fnmatch
 import functools
 import hashlib
 import inspect
 import itertools
 import logging
+import math
 import os
+import psutil
+import random
 import sys
+import time
 import uuid
 import warnings
 from typing import Optional
 
 import boto3
-import botocore
+from botocore.handlers import disable_signing
 import requests
 import tqdm
 
 S3_PREFIX = 's3://'
-
 
 if not sys.platform.startswith('win32'):
     # refer to https://github.com/untitaker/python-atomicwrites
@@ -29,15 +33,13 @@ if not sys.platform.startswith('win32'):
         """
         try:
             os.rename(src, dst)
-        except OSError:
+        except OSError as os_err:
             try:
                 os.remove(src)
             except OSError:
                 pass
             finally:
-                raise OSError(
-                    'Moving downloaded temp file - {}, to {} failed. \
-                    Please retry the download.'.format(src, dst))
+                raise OSError from os_err
 else:
     import ctypes
 
@@ -75,10 +77,10 @@ else:
         src : source file path
         dst : destination file path
         """
-        _handle_errors(ctypes.windll.kernel32.MoveFileExW(
-            _str_to_unicode(src), _str_to_unicode(dst),
-            _windows_default_flags | _MOVEFILE_REPLACE_EXISTING
-        ), src)
+        _handle_errors(
+            ctypes.windll.kernel32.MoveFileExW(_str_to_unicode(src), _str_to_unicode(dst),
+                                               _windows_default_flags | _MOVEFILE_REPLACE_EXISTING),
+            src)
 
 
 def sha1sum(filename):
@@ -94,17 +96,18 @@ def sha1sum(filename):
     """
     with open(filename, mode='rb') as f:
         d = hashlib.sha1()
-        for buf in iter(functools.partial(f.read, 1024*100), b''):
+        for buf in iter(functools.partial(f.read, 1024 * 100), b''):
             d.update(buf)
     return d.hexdigest()
 
 
-def download(url: str,
+def download(url: str,  # noqa: MC0001
              path: Optional[str] = None,
              overwrite: Optional[bool] = False,
              sha1_hash: Optional[str] = None,
              retries: Optional[int] = 5,
              verify_ssl: Optional[bool] = True) -> str:
+    # pylint: disable=too-many-arguments, too-many-locals, too-many-statements
     """Download a given URL
 
     Parameters
@@ -150,7 +153,6 @@ def download(url: str,
         if is_s3:
             s3 = boto3.resource('s3')
             if boto3.session.Session().get_credentials() is None:
-                from botocore.handlers import disable_signing
                 s3.meta.client.meta.events.register('choose-signer.s3.*', disable_signing)
             components = url[len(S3_PREFIX):].split('/')
             if len(components) < 2:
@@ -162,8 +164,7 @@ def download(url: str,
         if not os.path.exists(dirname):
             os.makedirs(dirname, exist_ok=True)
         while retries + 1 > 0:
-            # Disable pyling too broad Exception
-            # pylint: disable=W0703
+            # pylint: disable=broad-except
             try:
                 print('Downloading {} from {}...'.format(fname, url))
                 if is_s3:
@@ -215,7 +216,8 @@ def download(url: str,
                         pass
                     finally:
                         warnings.warn(
-                            'File {} exists in file system so the downloaded file is deleted'.format(fname))
+                            'File %s exists in file system so the downloaded file is deleted',
+                            fname)
                 if sha1_hash and not sha1sum(fname) == sha1_hash:
                     raise UserWarning(
                         'File {} is downloaded but the content hash does not match.'
@@ -285,14 +287,11 @@ def repeat(iterable, count=None, *, set_epoch=False):
                 yield sample
 
 
-def logging_config(folder: Optional[str] = None,
-                   name: Optional[str] = None,
-                   logger: logging.Logger = logging.root,
-                   level: int = logging.INFO,
-                   console_level: int = logging.INFO,
-                   console: bool = True,
-                   local_rank: Optional[int] = None,
-                   num_workers: Optional[int] = None,
+# pylint: disable=too-many-arguments, too-many-locals
+def logging_config(folder: Optional[str] = None, name: Optional[str] = None,
+                   logger: logging.Logger = logging.root, level: int = logging.INFO,
+                   console_level: int = logging.INFO, console: bool = True,
+                   local_rank: Optional[int] = None, num_workers: Optional[int] = None,
                    overwrite_handler: bool = False) -> str:
     """Config the logging module. It will set the logger to save to the specified file path.
     Parameters
@@ -362,24 +361,17 @@ def naming_convention(file_dir, file_name):
     """Rename files with 8-character hash"""
     long_hash = sha1sum(os.path.join(file_dir, file_name))
     file_prefix, file_sufix = file_name.split('.')
-    new_name = '{file_prefix}-{short_hash}.{file_sufix}'.format(
-        file_prefix=file_prefix,
-        short_hash=long_hash[:8],
-        file_sufix=file_sufix)
+    new_name = '{file_prefix}-{short_hash}.{file_sufix}'.format(file_prefix=file_prefix,
+                                                                short_hash=long_hash[:8],
+                                                                file_sufix=file_sufix)
     return new_name, long_hash
 
 
 # Python 3.9 feature backport https://github.com/python/cpython/pull/11478
 class BooleanOptionalAction(argparse.Action):
-    def __init__(self,
-                 option_strings,
-                 dest,
-                 default=None,
-                 type=None,
-                 choices=None,
-                 required=False,
-                 help=None,
-                 metavar=None):
+    def __init__(self, option_strings, dest, default=None, type=None, choices=None, required=False,
+                 help=None, metavar=None):
+        # pylint: disable=redefined-builtin
 
         _option_strings = []
         for option_string in option_strings:
@@ -392,16 +384,8 @@ class BooleanOptionalAction(argparse.Action):
         if help is not None and default is not None:
             help += f" (default: {default})"
 
-        super().__init__(
-            option_strings=_option_strings,
-            dest=dest,
-            nargs=0,
-            default=default,
-            type=type,
-            choices=choices,
-            required=required,
-            help=help,
-            metavar=metavar)
+        super().__init__(option_strings=_option_strings, dest=dest, nargs=0, default=default,
+                         type=type, choices=choices, required=required, help=help, metavar=metavar)
 
     def __call__(self, parser, namespace, values, option_string=None):
         if option_string in self.option_strings:
@@ -410,3 +394,150 @@ class BooleanOptionalAction(argparse.Action):
     def format_usage(self):
         return ' | '.join(self.option_strings)
 
+
+def wait_if_busy_fn(max_cpu, jitter, max_time, fn, /, *args, **kwargs):
+    """Higher-order function for waiting up to a max time if cpu utilization exceeds set limit
+    before executing the function.
+
+    Parameters
+    ----------
+    max_cpu : int or float
+        Utilization percentage limit that triggers wait.
+    jitter : int or float
+        The maximum random sleep time in seconds when waiting for the CPU to become less busy.
+    max_time : int or float or None
+        The maximum wait time in seconds this decorator allows. If None, wait indefinitely.
+    """
+    assert 0 <= max_cpu <= 100, f'max_cpu must be between 0 and 100, got: {max_cpu}'
+    assert jitter > 0, f'jitter must be greater than 0, got: {jitter}'
+    assert max_time is None or max_time > 0, \
+        f'max_time, if set, must be greater than 0, got: {max_time}'
+    time_waited = 0
+
+    # Sleep if high CPU util
+    while not max_time or time_waited < max_time:
+        if psutil.cpu_percent() > max_cpu:
+            to_wait = random.uniform(0, jitter)
+            time_waited += to_wait
+            time.sleep(to_wait)
+        else:
+            break
+    return fn(*args, **kwargs)
+
+
+def wait_if_busy(max_cpu, jitter, max_time=None):
+    """Higher-order function for waiting up to a max time if cpu utilization exceeds set limit
+    before executing the function.
+
+    Parameters
+    ----------
+    max_cpu : int or float
+        Utilization percentage limit that triggers wait.
+    jitter : int or float
+        The maximum random sleep time in seconds when waiting for the CPU to become less busy.
+    max_time : int or float or None
+        The maximum wait time in seconds this decorator allows.
+    """
+    assert 0 <= max_cpu <= 100, f'max_cpu must be between 0 and 100, got: {max_cpu}'
+    assert jitter > 0, f'jitter must be greater than 0, got: {jitter}'
+    assert max_time is None or max_time > 0, \
+        f'max_time, if set, must be greater than 0, got: {max_time}'
+
+    def decorator(func):
+        return functools.wraps(func)(functools.partial(wait_if_busy_fn, max_cpu, jitter, max_time,
+                                                       func))
+
+    return decorator
+
+
+def with_env_fn(env_dict, fn, /, *args, **kwargs):
+    """Higher-order function for Override environment variables when executing."""
+
+    assert all(isinstance(v, str) for v in env_dict.values()), \
+        'All environment variables should be passed as strings.'
+
+    before = {k: os.environ[k] for k in env_dict if k in os.environ}
+    os.environ.update(env_dict)
+    out = fn(*args, **kwargs)
+    for k in env_dict:
+        del os.environ[k]
+    os.environ.update(before)
+    return out
+
+
+def with_env(env_dict):
+    """Decorator for overriding environment variables when executing."""
+
+    assert all(isinstance(v, str) for v in env_dict.values()), \
+        'All environment variables should be passed as strings.'
+
+    def decorator(func):
+        return functools.wraps(func)(functools.partial(with_env_fn, env_dict, func))
+
+    return decorator
+
+
+def list_matched_s3_objects(bucket, prefix, pattern=None):
+    """List objects in the specified bucket with the provided prefix and pattern.
+
+    Parameters
+    ----------
+    bucket : str
+        S3 bucket name.
+    prefix : str
+        Desired object prefix.
+    pattern : str or None
+        Object key pattern to match, if provided.
+    """
+
+    client = boto3.client('s3')
+    object_list = client.list_objects(Bucket=bucket, Prefix=prefix)
+    object_keys = [obj['Key'] for obj in object_list.get('Contents', [])]
+    if pattern:
+        matched_keys = sorted(k for k in object_keys if fnmatch.fnmatch(k, pattern))
+    else:
+        matched_keys = sorted(object_keys)
+
+    return matched_keys
+
+
+def generate_shards(num_objs, num_partitions):
+    """Partitions a list of objects across a specified number of partitions,
+    so that each partition has the same number of shards, all items appear
+    the same number of times, and no two partition will have the same shard
+    at each index.
+
+    Parameters
+    ----------
+    num_objs : int
+        Number of objects to shard.
+    num_partitions : int
+        Number of total partitions.
+
+    Returns
+    -------
+    list of lists
+    """
+    assert num_partitions <= num_objs
+    n, p = num_objs, num_partitions
+    total_shards = n * p // math.gcd(n, p)  # lcm(n, p)
+    repeats = total_shards // n
+
+    perm_parts = {}
+    perm_indices = [i // 2 if i % 2 == 0 else (n + i + 1) // 2 for i in range(repeats)]
+    perm_indices_set = set(perm_indices)
+    largest = max(perm_indices_set)
+    for i, perm in enumerate(itertools.permutations(range(n))):
+        if i in perm_indices_set:
+            perm_parts[i] = perm
+            if i == largest:
+                break
+        else:
+            continue
+
+    perm_parts = [k for p in perm_indices for k in perm_parts[p]]
+
+    parts = []
+    for i in range(num_partitions):
+        parts.append(perm_parts[i::p])
+    return parts

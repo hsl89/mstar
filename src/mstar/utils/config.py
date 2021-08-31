@@ -17,10 +17,9 @@ class CfgNode(yacs.config.CfgNode):
         if isinstance(cfg_filename_or_other_cfg, str):
             ret.merge_from_file(cfg_filename_or_other_cfg)
             return ret
-        elif isinstance(cfg_filename_or_other_cfg, CfgNode):
+        if isinstance(cfg_filename_or_other_cfg, CfgNode):
             ret.merge_from_other_cfg(cfg_filename_or_other_cfg)
             return ret
-        elif cfg_filename_or_other_cfg is None:
+        if cfg_filename_or_other_cfg is None:
             return ret
-        else:
-            raise TypeError('Type of config path is not supported!')
+        raise TypeError('Type of config path is not supported!')

@@ -20,7 +20,6 @@ import torch as th
 from torch import nn
 import torch.nn.functional as F
 from .base import use_einsum_optimization
-from typing import Optional
 
 
 def gen_self_attn_mask(data,
@@ -120,8 +119,8 @@ def gen_self_attn_mask(data,
         else:
             seq_len_ones = th.ones((data.shape[time_axis],), device=device)  # (seq_length,)
             batch_ones = th.ones((data.shape[batch_axis],), device=device)   # (batch_size,)
-            mask = batch_ones.view((-1, 1, 1)) * seq_len_ones.view((1, -1, 1))\
-                   * seq_len_ones.view((1, 1, -1))
+            mask = batch_ones.view((-1, 1, 1)) * seq_len_ones.view((1, -1, 1)) \
+                * seq_len_ones.view((1, 1, -1))
     elif attn_type == 'causal':
         steps = th.arange(data.shape[time_axis], device=device)
         # mask: (seq_length, seq_length)
@@ -140,6 +139,7 @@ def gen_self_attn_mask(data,
 
 def gen_mem_attn_mask(mem, mem_valid_length, data, data_valid_length=None,
                       layout: str = 'NT'):
+    # pylint: disable=too-many-locals
     """Generate the mask used for the decoder. All query slots are attended to the memory slots.
 
     In our implementation, 1 --> not masked, 0 --> masked
@@ -229,7 +229,8 @@ def masked_softmax(att_score, mask, axis: int = -1):
         1 --> The element is not masked
         0 --> The element is masked
     axis
-        The axis to calculate the softmax. att_score.shape[axis] must be the same as mask.shape[axis]
+        The axis to calculate the softmax. att_score.shape[axis]
+        must be the same as mask.shape[axis]
 
     Returns
     -------
@@ -260,7 +261,8 @@ def masked_logsoftmax(att_score, mask, axis: int = -1):
         mask = 1 --> not masked
         mask = 0 --> masked
     axis
-        The axis to calculate the softmax. att_score.shape[axis] must be the same as mask.shape[axis]
+        The axis to calculate the softmax. att_score.shape[axis]
+        must be the same as mask.shape[axis]
 
     Returns
     -------
@@ -282,7 +284,7 @@ def masked_logsoftmax(att_score, mask, axis: int = -1):
     return logits
 
 
-def multi_head_dot_attn(query, key, value,
+def multi_head_dot_attn(query, key, value,  # noqa: MC0001
                         mask=None,
                         edge_scores=None,
                         dropout: float = 0.0,
@@ -290,6 +292,7 @@ def multi_head_dot_attn(query, key, value,
                         eps: float = 1E-6,
                         layout: str = 'NKT',
                         use_einsum: bool = None, *, training: bool = True):
+    # pylint: disable=too-many-locals, too-many-arguments
     """Multihead dot product attention between the query, key, value.
 
     scaled is False, normalized is False:
@@ -393,7 +396,8 @@ def multi_head_dot_attn(query, key, value,
 
         if edge_scores is not None:
             scores = scores + edge_scores
-        attn_weights = masked_softmax(scores / scale if scale is not None else scores, mask, axis=-1)
+        attn_weights = masked_softmax(
+            scores / scale if scale is not None else scores, mask, axis=-1)
         attn_weights = th.nn.functional.dropout(attn_weights, p=dropout, training=training)
         # 3. Calculate the context vector
         # (B, N, L_query, L_mem) X (B, N, L_mem, C_V) --> (B, L_query, N * C_V)
@@ -493,7 +497,8 @@ class MultiHeadAttentionCell(nn.Module):
     def __init__(self, query_units=None, num_heads=None, attention_dropout=0.0,
                  scaled: bool = True, normalized: bool = False, eps: float = 1E-6,
                  layout='NTK', use_einsum=None):
-        super(MultiHeadAttentionCell, self).__init__()
+        # pylint: disable=too-many-arguments
+        super().__init__()
         self._query_units = query_units
         self._num_heads = num_heads
         self._attention_dropout = attention_dropout
@@ -515,6 +520,7 @@ class MultiHeadAttentionCell(nn.Module):
         return self._layout
 
     def forward(self, query, key, value, mask=None, edge_scores=None):
+        # pylint: disable=too-many-arguments
         return multi_head_dot_attn(query=query, key=key, value=value,
                                    mask=mask, edge_scores=edge_scores,
                                    dropout=self._attention_dropout,

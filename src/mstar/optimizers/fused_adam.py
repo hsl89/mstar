@@ -21,16 +21,18 @@ class FusedAdam(torch.optim.Optimizer):
     This version of fused Adam implements 2 fusions.
 
       * Fusion of the Adam update's elementwise operations
-      * A multi-tensor apply launch that batches the elementwise updates applied to all the model's parameters into one or a few kernel launches.
+      * A multi-tensor apply launch that batches the elementwise updates applied
+        to all the model's parameters into one or a few kernel launches.
 
-    :class:`apex.optimizers.FusedAdam` may be used as a drop-in replacement for ``torch.optim.Adam``::
+    :class:`apex.optimizers.FusedAdam` may be used as a drop-in replacement
+    for ``torch.optim.Adam``::
 
         opt = apex.optimizers.FusedAdam(model.parameters(), lr = ....)
         ...
         opt.step()
 
-    :class:`apex.optimizers.FusedAdam` may be used with or without Amp.  If you wish to use :class:`FusedAdam` with Amp,
-    you may choose any ``opt_level``::
+    :class:`apex.optimizers.FusedAdam` may be used with or without Amp.  If you wish to
+    use :class:`FusedAdam` with Amp, you may choose any ``opt_level``::
 
         opt = apex.optimizers.FusedAdam(model.parameters(), lr = ....)
         model, opt = amp.initialize(model, opt, opt_level="O0" or "O1 or "O2")
@@ -41,8 +43,8 @@ class FusedAdam(torch.optim.Optimizer):
 
 
     .. warning::
-        A previous version of :class:`FusedAdam` allowed a number of additional arguments to ``step``.  These additional arguments
-        are now deprecated and unnecessary.
+        A previous version of :class:`FusedAdam` allowed a number of additional arguments
+        to ``step``.  These additional arguments are now deprecated and unnecessary.
 
     Adam was been proposed in `Adam: A Method for Stochastic Optimization`_.
 
@@ -68,6 +70,7 @@ class FusedAdam(torch.optim.Optimizer):
     .. _On the Convergence of Adam and Beyond:
         https://openreview.net/forum?id=ryQu7f-RZ
     """
+    # pylint: disable=too-many-arguments
     def __init__(self, params, lr=1e-3, bias_correction=True, betas=(0.9, 0.999), eps=1e-8,
                  adam_w_mode=True, weight_decay=0., amsgrad=False, set_grad_none=True):
 
@@ -75,34 +78,37 @@ class FusedAdam(torch.optim.Optimizer):
             raise RuntimeError('FusedAdam does not support the AMSGrad variant.')
         defaults = dict(lr=lr, bias_correction=bias_correction, betas=betas, eps=eps,
                         weight_decay=weight_decay)
-        super(FusedAdam, self).__init__(params, defaults)
+        super().__init__(params, defaults)
+        from mstar import fused_optimizers as amp_C  # pylint: disable=import-outside-toplevel
         self.adam_w_mode = 1 if adam_w_mode else 0
         self.set_grad_none = set_grad_none
-        from mstar import fused_optimizers as amp_C
         # Skip buffer
         self._dummy_overflow_buf = torch.cuda.IntTensor([0])
         self.multi_tensor_adam = amp_C.multi_tensor_adam
 
-    def zero_grad(self):
+    def zero_grad(self):  # pylint: disable=arguments-differ
         if self.set_grad_none:
             for group in self.param_groups:
                 for p in group['params']:
                     p.grad = None
         else:
-            super(FusedAdam, self).zero_grad()
+            super().zero_grad()
 
-    def step(self, closure=None, grads=None, output_params=None, scale=None, grad_norms=None):
+    def step(self, closure=None, grads=None,  # pylint: disable=arguments-differ, too-many-locals
+             output_params=None, scale=None, grad_norms=None):
         """Performs a single optimization step.
 
         Arguments:
             closure (callable, optional): A closure that reevaluates the model
                 and returns the loss.
 
-        The remaining arguments are deprecated, and are only retained (for the moment) for error-checking purposes.
+        The remaining arguments are deprecated, and are only retained (for the moment)
+        for error-checking purposes.
         """
         if any(p is not None for p in [grads, output_params, scale, grad_norms]):
             raise RuntimeError(
-                'FusedAdam has been updated.  Simply initialize it identically to torch.optim.Adam, and call step() with no arguments.'
+                'FusedAdam has been updated.  Simply initialize it identically to torch.optim.Adam,'
+                'and call step() with no arguments.'
             )
         loss = None
         if closure is not None:
@@ -128,7 +134,8 @@ class FusedAdam(torch.optim.Optimizer):
                     continue
                 if p.grad.data.is_sparse:
                     raise RuntimeError(
-                        'FusedAdam does not support sparse gradients, please consider SparseAdam instead'
+                        'FusedAdam does not support sparse gradients, '
+                        'please consider SparseAdam instead'
                     )
 
                 state = self.state[p]

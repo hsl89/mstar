@@ -48,7 +48,7 @@ def load(path):
     num_buffers = len(list(path.iterdir())) - 1  # exclude meta.idx
     buffers = []
     for idx in range(num_buffers):
-        f = open(path / f'{idx}.bin', 'rb')
-        buffers.append(mmap.mmap(f.fileno(), 0, prot=mmap.PROT_READ))
+        with open(path / f'{idx}.bin', 'rb') as f:
+            buffers.append(mmap.mmap(f.fileno(), 0, prot=mmap.PROT_READ))
     with open(path / 'meta.pkl', 'rb') as f:
         return pickle.load(f, buffers=buffers)

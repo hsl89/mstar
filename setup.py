@@ -57,6 +57,18 @@ requirements = [
     'psutil',
 ]
 
+tests_require = [
+    'prospector',
+    'pytest',
+    'pytest-mock',
+    'moto',
+    'lorem',
+]
+
+extras = {
+    'test': tests_require,
+}
+
 force_cuda = os.getenv("FORCE_CUDA", "0") == "1"
 extensions = []
 cmdclass = {}
@@ -101,6 +113,8 @@ setup(
     zip_safe=True,
     include_package_data=True,
     install_requires=requirements,
+    tests_require=tests_require,
+    extras_require=extras,
     ext_modules=extensions,
     cmdclass=cmdclass,
 )

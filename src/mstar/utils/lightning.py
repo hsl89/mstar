@@ -21,7 +21,6 @@ class AWSBatchEnvironment(LightningEnvironment):
         return self._master_port
 
     def node_rank(self) -> int:
-        r = int(os.environ["AWS_BATCH_JOB_NODE_INDEX"])
         return int(os.environ["AWS_BATCH_JOB_NODE_INDEX"])
 
 
@@ -30,7 +29,7 @@ class AWSBatchProgressBar(ProgressBarBase):
         super().__init__()
         self._active = True
         self._train_epoch_idx = 0
-        self._refresh_rate = 25
+        self._refresh_rate = refresh_rate
         self._last_batch_end_logged = None
 
     def disable(self):
@@ -47,7 +46,8 @@ class AWSBatchProgressBar(ProgressBarBase):
         self._train_epoch_idx += 1
         self._last_batch_end_logged = time.time()
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+    def on_train_batch_end(self,  # pylint: disable=too-many-arguments
+                           trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         self._train_batch_idx += 1
         if self._train_batch_idx % self._refresh_rate == 0:
             it_per_seconds = self._refresh_rate / (time.time() - self._last_batch_end_logged)

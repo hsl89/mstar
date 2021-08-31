@@ -20,8 +20,6 @@ from collections import OrderedDict
 import torch as th
 import numpy as np
 from torch import nn
-from typing import Union
-from .utils.torch import to_torch_dtype
 
 
 def sequence_mask(X, valid_len, value=0, axis=0):
@@ -45,7 +43,8 @@ def relative_position_bucket(relative_position,
     """Map the relative position to buckets.
 
     The major difference between our implementation and
-    that in [mesh_tensorflow](https://github.com/tensorflow/mesh/blob/c59988047e49b4d2af05603e3170724cdbadc467/mesh_tensorflow/transformer/transformer_layers.py#L595-L637)
+    that in `mesh_tensorflow
+    <https://github.com/tensorflow/mesh/blob/c59988047e49b4d2af05603e3170724cdbadc467/mesh_tensorflow/transformer/transformer_layers.py#L595-L637>`_
     is that we use 'query_i - mem_j' as the (i, j)-th location in relative_position.
     Thus, a positive value means that the query slot is in a later timestamp than the memory slot.
     However, in mesh transformer, it is treated as `mem_i - query_j` (reversed).
@@ -117,34 +116,34 @@ def get_activation(act, inplace=False):
     """
     if act is None:
         return lambda x: x
+
     if isinstance(act, str):
         if act == 'leaky':
             # TODO(sxjscience) Add regex matching here to parse `leaky(0.1)`
             return nn.LeakyReLU(0.1, inplace=inplace)
-        elif act == 'identity':
+        if act == 'identity':
             return nn.Identity()
-        elif act == 'elu':
+        if act == 'elu':
             return nn.ELU(inplace=inplace)
-        elif act == 'gelu':
+        if act == 'gelu':
             return nn.GELU()
-        elif act == 'gelu(tanh)':
+        if act == 'gelu(tanh)':
             return GELU_TANH()
-        elif act == 'relu':
+        if act == 'relu':
             return nn.ReLU()
-        elif act == 'sigmoid':
+        if act == 'sigmoid':
             return nn.Sigmoid()
-        elif act == 'tanh':
+        if act == 'tanh':
             return nn.Tanh()
-        elif act == 'softrelu' or act == 'softplus':
+        if act in {'softrelu', 'softplus'}:
             return nn.Softplus()
-        elif act == 'softsign':
+        if act == 'softsign':
             return nn.Softsign()
-        else:
-            raise NotImplementedError('act="{}" is not supported. '
-                                      'Try to include it if you can find that in '
-                                      'https://pytorch.org/docs/stable/nn.html'.format(act))
-    else:
-        return act
+        raise NotImplementedError('act="{}" is not supported. '
+                                  'Try to include it if you can find that in '
+                                  'https://pytorch.org/docs/stable/nn.html'.format(act))
+
+    return act
 
 
 def get_norm_layer(normalization: str = 'layer_norm',
@@ -177,8 +176,7 @@ def get_norm_layer(normalization: str = 'layer_norm',
         else:
             raise NotImplementedError('normalization={} is not supported'.format(normalization))
         return norm_layer
-    else:
-        raise NotImplementedError('The type of normalization must be str')
+    raise NotImplementedError('The type of normalization must be str')
 
 
 class GELU_TANH(nn.Module):
@@ -200,7 +198,7 @@ class PositionwiseFFN(nn.Module):
     Also, if we use gated projection. We will use
         fc1_1 * act(fc1_2(data)) to map the data
     """
-    def __init__(self,
+    def __init__(self,  # pylint: disable=too-many-arguments
                  units: int = 512,
                  hidden_size: int = 2048,
                  activation_dropout: float = 0.0,
@@ -299,10 +297,11 @@ def get_positional_embedding(units, max_length=None,
                              embed_method='learn_sinusoidal'):
     if embed_method == 'sinusoidal':
         return SinusoidalPositionalEmbedding(units, learnable=False)
-    elif embed_method == 'learned_sinusoidal':
+    if embed_method == 'learned_sinusoidal':
         return SinusoidalPositionalEmbedding(units, learnable=True)
-    elif embed_method == 'learned':
+    if embed_method == 'learned':
         return nn.Embedding(num_embeddings=max_length, embedding_dim=units)
+    raise NotImplementedError()
 
 
 class SinusoidalPositionalEmbedding(nn.Module):
@@ -358,8 +357,7 @@ class SinusoidalPositionalEmbedding(nn.Module):
         cos_emb = th.cos(emb)
         if self._units % 2 == 0:
             return th.cat([sin_emb, cos_emb], dim=-1)
-        else:
-            return th.cat([sin_emb, cos_emb, th.zeros_like(positions).unsqueeze(-1)], dim=-1)
+        return th.cat([sin_emb, cos_emb, th.zeros_like(positions).unsqueeze(-1)], dim=-1)
 
     def __repr__(self):
         s = '{name}(units={units}, learnable={learnable})'

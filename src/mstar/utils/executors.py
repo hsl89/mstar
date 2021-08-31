@@ -22,7 +22,7 @@ class LazyThreadPoolExecutor(ThreadPoolExecutor):
     - https://github.com/python/cpython/pull/707
 
     """
-    def map(self, fn, *iterables, timeout=None, prefetch=None):
+    def map(self, fn, *iterables, timeout=None, chunksize=1, prefetch=None):
         # pylint: disable=arguments-differ
         """Lazy apdaption of ThreadPoolExecutor.map.
 
@@ -30,6 +30,7 @@ class LazyThreadPoolExecutor(ThreadPoolExecutor):
         - iterables are prefetched lazily
 
         """
+        assert chunksize == 1
         if timeout is not None:
             end_time = timeout + time.time()
         if prefetch is None:
@@ -80,7 +81,7 @@ class LazyProcessPoolExecutor(ProcessPoolExecutor):
     - https://github.com/python/cpython/pull/707
 
     """
-    def map(self, fn, *iterables, timeout=None, prefetch=None):
+    def map(self, fn, *iterables, timeout=None, chunksize=1, prefetch=None):
         # pylint: disable=arguments-differ
         """Lazy apdaption of ProcessPoolExecutor.map.
 
@@ -88,6 +89,7 @@ class LazyProcessPoolExecutor(ProcessPoolExecutor):
         - iterables are prefetched lazily
 
         """
+        assert chunksize == 1
         if timeout is not None:
             end_time = timeout + time.time()
         if prefetch is None:

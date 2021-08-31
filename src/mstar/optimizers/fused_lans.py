@@ -21,7 +21,8 @@ class FusedLANS(torch.optim.Optimizer):
     This version of fused LAMB implements 2 fusions.
 
       * Fusion of the Nesterov LAMB update's elementwise operations
-      * A multi-tensor apply launch that batches the elementwise updates applied to all the model's parameters into one or a few kernel launches.
+      * A multi-tensor apply launch that batches the elementwise updates applied to all the model's
+        parameters into one or a few kernel launches.
 
     :class:`apex.optimizers.FusedLANS`'s usage is identical to any ordinary Pytorch optimizer::
 
@@ -29,8 +30,8 @@ class FusedLANS(torch.optim.Optimizer):
         ...
         opt.step()
 
-    :class:`apex.optimizers.FusedLANS` may be used with or without Amp.  If you wish to use :class:`FusedLANS` with Amp,
-    you may choose any ``opt_level``::
+    :class:`apex.optimizers.FusedLANS` may be used with or without Amp.  If you wish to
+    use :class:`FusedLANS` with Amp, you may choose any ``opt_level``::
 
         opt = apex.optimizers.FusedLANS(model.parameters(), lr = ....)
         model, opt = amp.initialize(model, opt, opt_level="O0" or "O1 or "O2")
@@ -60,17 +61,19 @@ class FusedLANS(torch.optim.Optimizer):
     .. _Accelerated Large Batch Optimization of BERT Pretraining in 54 minutes:
         https://arxiv.org/abs/2006.13484
     """
+    # pylint: disable=too-many-arguments
     def __init__(self, params, lr=1e-3, bias_correction=True, betas=(0.9, 0.999), eps=1e-6,
                  weight_decay=0.01, adam_w_mode=True, grad_averaging=True, set_grad_none=True,
                  normalize_grad=True):
         defaults = dict(lr=lr, bias_correction=bias_correction, betas=betas, eps=eps,
                         weight_decay=weight_decay, grad_averaging=grad_averaging,
                         normalize_grad=normalize_grad)
-        super(FusedLANS, self).__init__(params, defaults)
-        from mstar import fused_optimizers as amp_C
+        super().__init__(params, defaults)
+        from mstar import fused_optimizers as amp_C  # pylint: disable=import-outside-toplevel
         # Skip buffer
-        self._dummy_overflow_buf = torch.tensor([0], dtype=torch.int,
-                                                device=self.param_groups[0]["params"][0].device)
+        self._dummy_overflow_buf = torch.tensor(
+            [0], dtype=torch.int,
+            device=self.param_groups[0]["params"][0].device)
         self.multi_tensor_lans = amp_C.multi_tensor_lans
 
         self.adam_w_mode = 1 if adam_w_mode else 0
@@ -82,9 +85,9 @@ class FusedLANS(torch.optim.Optimizer):
                 for p in group['params']:
                     p.grad = None
         else:
-            super(FusedLANS, self).zero_grad()
+            super().zero_grad()
 
-    def step(self, closure=None):
+    def step(self, closure=None):  # pylint: disable=too-many-locals
         """Performs a single optimization step.
 
         Arguments:
@@ -116,7 +119,8 @@ class FusedLANS(torch.optim.Optimizer):
                     continue
                 if p.grad.data.is_sparse:
                     raise RuntimeError(
-                        'FusedLANS does not support sparse gradients, please consider SparseAdam instead'
+                        'FusedLANS does not support sparse gradients, '
+                        'please consider SparseAdam instead'
                     )
 
                 state = self.state[p]

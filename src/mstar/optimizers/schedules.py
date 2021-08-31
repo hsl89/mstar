@@ -18,8 +18,9 @@ from torch.optim.lr_scheduler import LambdaLR
 __all__ = ['get_warmup_linear_const_decay_poly_schedule']
 
 
-def get_warmup_linear_const_decay_poly_schedule(optimizer, total_steps, warmup_ratio=0.002,
-                                                const_ratio=0., degree=1.0, last_epoch=-1):
+def get_warmup_linear_const_decay_poly_schedule(  # pylint: disable='too-many-arguments'
+    optimizer, total_steps, warmup_ratio=0.002,
+    const_ratio=0., degree=1.0, last_epoch=-1):
     """Create a schedule with a learning rate that decreases linearly from the
     initial lr set in the optimizer to 0, after a warmup period during which it
     increases linearly from 0 to the initial lr set in the optimizer and a
@@ -45,9 +46,9 @@ def get_warmup_linear_const_decay_poly_schedule(optimizer, total_steps, warmup_r
         x = global_step / total_steps
         if warmup_ratio == 0.0:
             return 1.0
-        elif x < warmup_ratio:
+        if x < warmup_ratio:
             return x / warmup_ratio
-        elif x < warmup_ratio + const_ratio:
+        if x < warmup_ratio + const_ratio:
             return 1.0
         return ((1.0 - x) / (1.0 - warmup_ratio - const_ratio))**degree
 

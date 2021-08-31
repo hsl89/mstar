@@ -1,6 +1,6 @@
 __all__ = ['TransformerEncoderLayer', 'TransformerDecoderLayer', 'TransformerDecoder']
 
-from typing import Union, Optional, List
+from typing import Optional
 from torch import nn
 import torch as th
 from ..layers import PositionwiseFFN
@@ -8,8 +8,10 @@ from ..attention_cell import MultiHeadAttentionCell, gen_mem_attn_mask, gen_self
 from ..utils.torch import to_torch_dtype
 
 
+
 class TransformerEncoderLayer(nn.Module):
     """Transformer Encoder Layer"""
+    # pylint: disable=too-many-arguments
     def __init__(self,
                  units: int = 512,
                  hidden_size: int = 2048,
@@ -126,6 +128,7 @@ class TransformerEncoderLayer(nn.Module):
 
 
 class TransformerDecoderLayer(nn.Module):
+    # pylint: disable=too-many-arguments
     def __init__(self, units: int = 512,
                  mem_units: Optional[int] = None,
                  hidden_size: int = 2048,
@@ -283,17 +286,17 @@ class TransformerDecoderLayer(nn.Module):
         if self._pre_norm:
             data = self.ln_in(data)
         self_query, self_key, self_value = th.split(self.attn_in_qkv(data), self._units, dim=-1)
-        out, [_, self_attn_weight] = self.self_attention(
-                self_query.reshape((self_query.shape[0],
-                                    self_query.shape[1],
-                                    self._num_heads, -1)),
-                self_key.reshape((self_key.shape[0],
-                                  self_key.shape[1],
-                                  self._num_heads, -1)),
-                self_value.reshape((self_value.shape[0],
-                                    self_value.shape[1],
-                                    self._num_heads, -1)),
-                self_causal_mask)
+        out, _ = self.self_attention(
+            self_query.reshape((self_query.shape[0],
+                                self_query.shape[1],
+                                self._num_heads, -1)),
+            self_key.reshape((self_key.shape[0],
+                              self_key.shape[1],
+                              self._num_heads, -1)),
+            self_value.reshape((self_value.shape[0],
+                                self_value.shape[1],
+                                self._num_heads, -1)),
+            self_causal_mask)
         out = self.proj_in(out)
         out = self.dropout_layer(out)
         out = out + residual
@@ -304,14 +307,14 @@ class TransformerDecoderLayer(nn.Module):
         residual = data
         if self._pre_norm:
             data = self.ln_inter(data)
-        out, [_, context_attn_weight] = self.inter_attention(
-                th.reshape(self.attn_inter_q(data),
-                           (data.shape[0], data.shape[1], self._num_heads, -1)),
-                th.reshape(self.attn_inter_k(mem),
-                           (mem.shape[0], mem.shape[1], self._num_heads, -1)),
-                th.reshape(self.attn_inter_v(mem),
-                           (mem.shape[0], mem.shape[1], self._num_heads, -1)),
-                mem_attn_mask)
+        out, _ = self.inter_attention(
+            th.reshape(self.attn_inter_q(data),
+                       (data.shape[0], data.shape[1], self._num_heads, -1)),
+            th.reshape(self.attn_inter_k(mem),
+                       (mem.shape[0], mem.shape[1], self._num_heads, -1)),
+            th.reshape(self.attn_inter_v(mem),
+                       (mem.shape[0], mem.shape[1], self._num_heads, -1)),
+            mem_attn_mask)
         out = self.proj_inter(out)
         out = self.dropout_layer(out)
         out = out + residual
@@ -323,10 +326,8 @@ class TransformerDecoderLayer(nn.Module):
 
     @property
     def state_batch_axis(self):
-        if self.layout == 'NT':
-            return 0, 0
-        else:
-            return 1, 1
+        axis = self.layout.find('N')
+        return axis, axis
 
     def init_states(self, batch_size, device=None, dtype='float32'):
         """Initialize the states required for incremental decoding
@@ -367,7 +368,8 @@ class TransformerDecoderLayer(nn.Module):
                                   device=device, dtype=dtype)
         return init_key, init_value
 
-    def incremental_decode(self, data, states, mem, mem_valid_length, mem_attn_mask=None):
+    def incremental_decode(self, data, states,  # pylint: disable=too-many-locals
+                           mem, mem_valid_length, mem_attn_mask=None):
         """Incrementally generate the output given the decoder input.
 
         Parameters
@@ -433,13 +435,15 @@ class TransformerDecoderLayer(nn.Module):
         step_query = th.reshape(step_query,
                                 shape=(step_query.shape[0], step_query.shape[1],
                                        self._num_heads, -1))
-        step_key = th.reshape(step_key,
-                              shape=(step_key.shape[0], step_key.shape[1], self._num_heads, -1))
-        step_value = th.reshape(step_value,
-                                shape=(step_value.shape[0], step_value.shape[1], self._num_heads, -1))
+        step_key = th.reshape(
+            step_key,
+            shape=(step_key.shape[0], step_key.shape[1], self._num_heads, -1))
+        step_value = th.reshape(
+            step_value,
+            shape=(step_value.shape[0], step_value.shape[1], self._num_heads, -1))
         new_key = th.cat([prev_key, step_key], dim=time_axis)
         new_value = th.cat([prev_value, step_value], dim=time_axis)
-        out, [_, attn_weight] = self.self_attention(step_query, new_key, new_value, None)
+        out, _ = self.self_attention(step_query, new_key, new_value, None)
         out = self.proj_in(out)
         out = self.dropout_layer(out)
         out = out + residual
@@ -470,6 +474,7 @@ class TransformerDecoderLayer(nn.Module):
 
 
 class TransformerDecoder(nn.Module):
+    # pylint: disable=too-many-arguments, too-many-locals
     def __init__(self, num_layers=6,
                  recurrent=False,
                  units=512, mem_units=None,
@@ -498,7 +503,7 @@ class TransformerDecoder(nn.Module):
         # Construct the intermediate layers
         self.layers = nn.ModuleList()
         real_num_layers = 1 if recurrent else num_layers
-        for i in range(real_num_layers):
+        for _ in range(real_num_layers):
             self.layers.append(TransformerDecoderLayer(units=units,
                                                        mem_units=mem_units,
                                                        hidden_size=hidden_size,

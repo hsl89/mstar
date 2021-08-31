@@ -15,8 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 """Create a registry."""
+# pylint: disable=unsubscriptable-object
 
-from typing import Optional, List
+from typing import List
 import json
 from json import JSONDecodeError
 
@@ -73,7 +74,7 @@ __main__.MyModelWithNickName
 
     def __init__(self, name: str) -> None:
         self._name: str = name
-        self._obj_map: dict[str, object] = dict()
+        self._obj_map: dict[str, object] = {}
 
     def _do_register(self, name: str, obj: object) -> None:
         assert (
@@ -92,25 +93,29 @@ __main__.MyModelWithNickName
             # Register an object with nick name by function call
             nickname, obj = args
             self._do_register(nickname, obj)
-        elif len(args) == 1:
+            return None
+        if len(args) == 1:
             if isinstance(args[0], str):
                 # Register an object with nick name by decorator
                 nickname = args[0]
+
                 def deco(func_or_class: object) -> object:
                     self._do_register(nickname, func_or_class)
                     return func_or_class
                 return deco
-            else:
-                # Register an object by function call
-                self._do_register(args[0].__name__, args[0])
-        elif len(args) == 0:
+
+            # Register an object by function call
+            self._do_register(args[0].__name__, args[0])
+            return None
+        if len(args) == 0:
             # Register an object by decorator
-            def deco(func_or_class: object) -> object:
+
+            def deco2(func_or_class: object) -> object:
                 self._do_register(func_or_class.__name__, func_or_class)
                 return func_or_class
-            return deco
-        else:
-            raise ValueError('Do not support the usage!')
+            return deco2
+
+        raise ValueError('Do not support the usage!')
 
     def get(self, name: str) -> object:
         ret = self._obj_map.get(name)
@@ -169,14 +174,14 @@ __main__.MyModelWithNickName
         """
         try:
             args = json.loads(json_str)
-        except JSONDecodeError:
+        except JSONDecodeError as e:
             raise ValueError('Unable to decode the json string: json_str="{}"'
-                             .format(json_str))
+                             .format(json_str)) from e
         if isinstance(args, (list, tuple)):
             return self.create(name, *args)
-        elif isinstance(args, dict):
+        if isinstance(args, dict):
             return self.create(name, **args)
-        else:
-            raise NotImplementedError('The format of json string is not supported! We only support '
-                                      'list/dict. json_str="{}".'
-                                      .format(json_str))
+
+        raise NotImplementedError('The format of json string is not supported! We only support '
+                                  'list/dict. json_str="{}".'
+                                  .format(json_str))
