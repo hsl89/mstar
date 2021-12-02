@@ -1,5 +1,35 @@
-max-line-length: 100
+max-line-length: 300
+
+pyflakes:
+  disable:
+    - F401
+    - F821
+    - F841
+    - F523
+
+mccabe:
+  disable:
+    - MC0001
 
 pylint:
+  disable:
+    - no-else-raise
+    - consider-using-f-string
+    - useless-object-inheritance
+    - use-dict-literal
+    - use-list-literal
+    - useless-suppression
+    - no-else-return
+    - logging-not-lazy
+    - format-string-without-interpolation
+    - consider-merging-isinstance
+    - inconsistent-return-statements
+    - too-many-locals
+    - too-many-branches
+    - too-many-arguments
+    - unused-variable
+    - raise-missing-from
+    - too-many-nested-blocks
+    - arguments-differ
   options:
     generated-members: numpy.*,torch.*

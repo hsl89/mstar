@@ -55,6 +55,9 @@ requirements = [
     'fairscale',
     'asttokens',
     'psutil',
+    'ujson',
+    'seqeval',
+    'datasets',
 ]
 
 tests_require = [
