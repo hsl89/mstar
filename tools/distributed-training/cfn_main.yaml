@@ -1,0 +1,88 @@
+Description: Main ressources and cross-region replication for Mstar
+
+Resources:
+  S3ReplicationRole:
+    Type: 'AWS::IAM::Role'
+    DeletionPolicy: "Retain"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - 's3.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+      - PolicyName: BucketReplication
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - "s3:ListBucket"
+                - "s3:GetReplicationConfiguration"
+                - "s3:GetObjectVersionForReplication"
+                - "s3:GetObjectVersionAcl"
+                - "s3:GetObjectVersionTagging"
+                - "s3:GetObjectRetention"
+                - "s3:GetObjectLegalHold"
+              Resource:
+                - "arn:aws:s3:::mstar-data"
+                - "arn:aws:s3:::mstar-data/*"
+                - "arn:aws:s3:::mstar-data-us-east-2"
+                - "arn:aws:s3:::mstar-data-us-east-2/*"
+                - "arn:aws:s3:::mstar-data-us-east-1"
+                - "arn:aws:s3:::mstar-data-us-east-1/*"
+            - Effect: Allow
+              Action:
+                - "s3:ReplicateObject"
+                - "s3:ReplicateDelete"
+                - "s3:ReplicateTags"
+                - "s3:ObjectOwnerOverrideToBucketOwner"
+              Resource:
+                - "arn:aws:s3:::mstar-data/*"
+                - "arn:aws:s3:::mstar-data-us-east-2/*"
+                - "arn:aws:s3:::mstar-data-us-east-1/*"
+
+  S3DataBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: "Retain"
+    Properties:
+      BucketName: 'mstar-data'
+      ReplicationConfiguration:
+        Role: !GetAtt S3ReplicationRole.Arn
+        Rules:
+          - Status: Enabled
+            Filter:  # Filter must be specified to enable v2 replication rules with replication time constraints
+              Prefix: ""
+            Priority: 0
+            Destination:
+              Bucket: "arn:aws:s3:::mstar-data-us-east-2"
+              ReplicationTime:
+                Status: Enabled
+                Time:
+                  Minutes: 15
+              Metrics:
+                EventThreshold:
+                  Minutes: 15
+                Status: Enabled
+            DeleteMarkerReplication:
+              Status: Enabled
+          - Status: Enabled
+            Filter:  # Filter must be specified to enable v2 replication rules with replication time constraints
+              Prefix: ""
+            Priority: 1
+            Destination:
+              Bucket: "arn:aws:s3:::mstar-data-us-east-1"
+              ReplicationTime:
+                Status: Enabled
+                Time:
+                  Minutes: 15
+              Metrics:
+                EventThreshold:
+                  Minutes: 15
+                Status: Enabled
+            DeleteMarkerReplication:
+              Status: Enabled

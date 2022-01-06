@@ -61,13 +61,20 @@ Resources:
                 - Name: fsx
                   Host:
                     SourcePath: /fsx
+                - Name: fsx_out
+                  Host:
+                    SourcePath: /fsx_out
               MountPoints:
                 - SourceVolume: fsx
                   ContainerPath: /mnt
                   ReadOnly: true
+                - SourceVolume: fsx_out
+                  ContainerPath: /mnt_out
+                  ReadOnly: false
               Vcpus: 96
               Memory: 1090000  # out of 1098633
               LogConfiguration:
                 LogDriver: awslogs
                 Options:
                   "awslogs-group": !Ref BatchLogGroup
+              Privileged: true

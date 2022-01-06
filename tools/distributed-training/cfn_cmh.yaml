@@ -27,13 +27,13 @@ Resources:
       VersioningConfiguration:  # Required for bucket replication
         Status: Enabled
 
-  BasicS3LinkedLustreFileSystemC:
+  BasicS3LinkedLustreFileSystem:
     Type: AWS::FSx::FileSystem
     Properties:
       FileSystemType: "LUSTRE"
       FileSystemTypeVersion: 2.12
       StorageCapacity: 12000
-      SubnetIds: [!Ref IPv6SubnetC]
+      SubnetIds: [!Ref IPv6SubnetB]
       SecurityGroupIds: [!Ref BatchSecurityGroup]
       LustreConfiguration:
         AutoImportPolicy: "NEW_CHANGED"
@@ -45,13 +45,13 @@ Resources:
         - Key: Name
           Value: !Sub '${AWS::StackName}-data'
 
-  DevS3LinkedLustreFileSystemC:
+  DevS3LinkedLustreFileSystem:
     Type: AWS::FSx::FileSystem
     Properties:
       FileSystemType: "LUSTRE"
       FileSystemTypeVersion: 2.12
       StorageCapacity: 12000
-      SubnetIds: [!Ref IPv6SubnetC]
+      SubnetIds: [!Ref IPv6SubnetB]
       SecurityGroupIds: [!Ref BatchSecurityGroup]
       LustreConfiguration:
         AutoImportPolicy: "NEW_CHANGED"
@@ -126,18 +126,18 @@ Resources:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref BatchVPC
-  NatEipC:
+  NatEip:
      Type: AWS::EC2::EIP
-  NatGatewayC:
+  NatGateway:
     Type: AWS::EC2::NatGateway
     Properties:
-      AllocationId: !GetAtt NatEipC.AllocationId
-      SubnetId: !Ref PublicSubnetC
+      AllocationId: !GetAtt NatEip.AllocationId
+      SubnetId: !Ref PublicSubnetB
   NatRoute:
     Type: AWS::EC2::Route
     Properties:
       DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGatewayC
+      NatGatewayId: !Ref NatGateway
       RouteTableId: !Ref RouteTable
   InternetRoute:
     Type: AWS::EC2::Route
@@ -153,20 +153,20 @@ Resources:
       DestinationIpv6CidrBlock: '::/0'
       GatewayId: !Ref InternetGateway
       RouteTableId: !Ref RouteTable
-  PublicSubnetC:
+  PublicSubnetB:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref BatchVPC
-      AvailabilityZone: us-east-1c
+      AvailabilityZone: us-east-2b
       CidrBlock: 10.0.132.0/20
-  IPv6SubnetC:
+  IPv6SubnetB:
     Type: AWS::EC2::Subnet
     DependsOn: BatchVpcCidrBlockIpv6
     Properties:
       VpcId: !Ref BatchVPC
-      AvailabilityZone: us-east-1c
+      AvailabilityZone: us-east-2b
       CidrBlock: 10.0.32.0/20
-      Ipv6CidrBlock: !Select [2, !Cidr [!Select [0, !GetAtt 'BatchVPC.Ipv6CidrBlocks'], 256, 64]]
+      Ipv6CidrBlock: !Select [1, !Cidr [!Select [0, !GetAtt 'BatchVPC.Ipv6CidrBlocks'], 256, 64]]
       # "AWS Batch multi-node parallel jobs use the Amazon ECS awsvpc network
       # mode, which gives your multi-node parallel job containers the same
       # networking properties as Amazon EC2 instances. Each multi-node parallel
@@ -176,16 +176,16 @@ Resources:
       # Therefore AssignIpv6AddressOnCreation: true to ensure they also get a
       # IPv6 address
       AssignIpv6AddressOnCreation: true
-  PublicSubnetCRouteTableAssociation:
+  PublicSubnetBRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref PublicRouteTable
-      SubnetId: !Ref PublicSubnetC
-  IPv6SubnetCRouteTableAssociation:
+      SubnetId: !Ref PublicSubnetB
+  IPv6SubnetDRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref RouteTable
-      SubnetId: !Ref IPv6SubnetC
+      SubnetId: !Ref IPv6SubnetB
   BatchSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -318,7 +318,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: 'ec2:TerminateInstances'
-                Resource: 'arn:aws:ec2:us-east-1:216212465934:instance/*'
+                Resource: 'arn:aws:ec2:us-east-2:216212465934:instance/*'
   EcsInstanceProfile:
     DependsOn: EcsInstanceRole
     Type: AWS::IAM::InstanceProfile
@@ -329,19 +329,15 @@ Resources:
   ################################################################################
   # Instance configuration
   ################################################################################
-  P4PlacementGroupC:
+  P4dPlacementGroupB:
    Type: AWS::EC2::PlacementGroup
    Properties:
      Strategy: cluster
 
-  # P4d is available in us-east-1a, us-east-1c, us-east-1d
-  P4LaunchTemplateC:
+  P4LaunchTemplateB:
     Type: "AWS::EC2::LaunchTemplate"
     Properties:
       LaunchTemplateData:
-        CapacityReservationSpecification:
-          CapacityReservationTarget:
-            CapacityReservationId: cr-016bf2ead6736529c
         Monitoring:
           Enabled: true
         BlockDeviceMappings:
@@ -350,7 +346,7 @@ Resources:
               DeleteOnTermination: true
               VolumeSize: 128
               VolumeType: gp3
-        ImageId: ami-05ffd15d4bd815259
+        ImageId: ami-0ad5ad4fc21853cae  # /aws/service/ecs/optimized-ami/amazon-linux-2/gpu/recommended/image_id Version 75 2021-11-19T03:45:17 UTC
         InstanceType: p4d.24xlarge
         InstanceInitiatedShutdownBehavior: terminate
         KeyName: lausen
@@ -365,7 +361,7 @@ Resources:
             # CLIENT_ERROR - Instance launch failed with user error. Each
             # network interface requires either a subnet or a network interface
             # ID.
-            SubnetId: !Ref IPv6SubnetC
+            SubnetId: !Ref IPv6SubnetB
             Groups:
               - !Ref BatchSecurityGroup
             InterfaceType: efa
@@ -373,7 +369,7 @@ Resources:
             NetworkCardIndex: 1
             DeviceIndex: 1
             DeleteOnTermination: true
-            SubnetId: !Ref IPv6SubnetC
+            SubnetId: !Ref IPv6SubnetB
             Groups:
               - !Ref BatchSecurityGroup
             InterfaceType: efa
@@ -381,7 +377,7 @@ Resources:
             NetworkCardIndex: 2
             DeviceIndex: 2
             DeleteOnTermination: true
-            SubnetId: !Ref IPv6SubnetC
+            SubnetId: !Ref IPv6SubnetB
             Groups:
               - !Ref BatchSecurityGroup
             InterfaceType: efa
@@ -389,7 +385,7 @@ Resources:
             NetworkCardIndex: 3
             DeviceIndex: 3
             DeleteOnTermination: true
-            SubnetId: !Ref IPv6SubnetC
+            SubnetId: !Ref IPv6SubnetB
             Groups:
               - !Ref BatchSecurityGroup
             InterfaceType: efa
@@ -497,43 +493,43 @@ Resources:
                 """
 
                 --==MYBOUNDARY==--
-              - DNSName: !GetAtt BasicS3LinkedLustreFileSystemC.DNSName
-                LustreMountName: !GetAtt BasicS3LinkedLustreFileSystemC.LustreMountName
-                OutDNSName: !GetAtt DevS3LinkedLustreFileSystemC.DNSName
-                OutLustreMountName: !GetAtt DevS3LinkedLustreFileSystemC.LustreMountName
+              - DNSName: !GetAtt BasicS3LinkedLustreFileSystem.DNSName
+                LustreMountName: !GetAtt BasicS3LinkedLustreFileSystem.LustreMountName
+                OutDNSName: !GetAtt DevS3LinkedLustreFileSystem.DNSName
+                OutLustreMountName: !GetAtt DevS3LinkedLustreFileSystem.LustreMountName
 
   ################################################################################
   # AWS Batch
   ################################################################################
   # Managed multi-node parallel environment
-  P4BatchComputeEnvironmentReservedC:
+  P4BatchComputeEnvironmentB:
     Type: AWS::Batch::ComputeEnvironment
-    DependsOn: P4LaunchTemplateC
+    DependsOn: P4LaunchTemplateB
     Properties:
       Type: MANAGED
       ServiceRole: !GetAtt BatchServiceRole.Arn
       ComputeResources:
-        MaxvCpus: 3072  # 96 vCPUs per p4d
+        MaxvCpus: 6144  # 96 vCPUs per p4d; 32 p4d
         MinvCpus: 0  # MinvCpus, DesiredvCpus 0 to avoid use of (unsupported) AutoScalingGroup
-        PlacementGroup: !Ref P4PlacementGroupC
+        PlacementGroup: !Ref P4dPlacementGroupB
         Type: EC2
         AllocationStrategy: BEST_FIT
         InstanceRole: !Ref EcsInstanceProfile
         LaunchTemplate:
-          LaunchTemplateId: !Ref P4LaunchTemplateC
+          LaunchTemplateId: !Ref P4LaunchTemplateB
           Version: "$Latest"  # Not updated after ComputeEnvironment creation
         InstanceTypes: [ p4d.24xlarge ]
         Tags: {"Name" : "Batch Instance - P4OnDemand"}
-        Subnets: [ !Ref IPv6SubnetC ]
+        Subnets: [ !Ref IPv6SubnetB ]
       State: ENABLED
 
-  P4BatchJobQueueC:
+  P4BatchJobQueue:
     Type: AWS::Batch::JobQueue
     Properties:
-      JobQueueName: !Sub '${AWS::StackName}-p4-c'
+      JobQueueName: !Sub '${AWS::StackName}-p4'
       Priority: 1
       ComputeEnvironmentOrder:
-        - ComputeEnvironment: !Ref P4BatchComputeEnvironmentReservedC
+        - ComputeEnvironment: !Ref P4BatchComputeEnvironmentB
           Order: 1
 
   ################################################################################
