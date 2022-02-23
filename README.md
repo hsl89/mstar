@@ -10,3 +10,5 @@ Source code for the research on mstar pretraining experiments.
 pip install torch==1.8.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 pip install -U -e . --no-build-isolation
 ```
+
+**Note:** To contribute to mstar repository, please create a new branch in mstar/mstar instead of forking the repository. 
