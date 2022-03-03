@@ -71,39 +71,88 @@ tests_require = [
 extras = {
     'test': tests_require,
 }
-
 force_cuda = os.getenv("FORCE_CUDA", "0") == "1"
 extensions = []
 cmdclass = {}
 if (torch.cuda.is_available() and CUDA_HOME is not None) or force_cuda:
-    extensions.extend([
-        CUDAExtension(
-            name="mstar.fused_optimizers",
-            include_dirs=[
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), "src/mstar/clib")
-            ],
-            sources=[
-                "src/mstar/clib/amp_C_frontend.cpp", "src/mstar/clib/multi_tensor_lans.cu",
-                "src/mstar/clib/multi_tensor_adam.cu",
-                "src/mstar/clib/multi_tensor_l2norm_kernel.cu"
-            ],
-            extra_compile_args={
-                "cxx": ["-O3"],
-                "nvcc": ["-O3", "--use_fast_math"]
-            },
-        )
-    ])
+    optimizer_include_dirs = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "src/mstar/clib")
+    ]
+    megatron_include_dirs = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "src/mstar/clib/megatron")
+    ]
+
+    fused_softmax_nvcc = [
+        "-O3",
+        "--use_fast_math",
+        "-U__CUDA_NO_HALF_OPERATORS__",
+        "-U__CUDA_NO_HALF_CONVERSIONS__",
+        "--expt-relaxed-constexpr",
+        "--expt-extended-lambda",
+    ]
+    extensions.extend(
+        [
+            CUDAExtension(
+                name="mstar.fused_optimizers",
+                include_dirs=optimizer_include_dirs,
+                sources=[
+                    "src/mstar/clib/amp_C_frontend.cpp",
+                    "src/mstar/clib/multi_tensor_lans.cu",
+                    "src/mstar/clib/multi_tensor_adam.cu",
+                    "src/mstar/clib/multi_tensor_l2norm_kernel.cu",
+                ],
+                extra_compile_args={"cxx": ["-O3"], "nvcc": ["-O3", "--use_fast_math"]},
+            ),
+            # Megatron kernels imported from
+            # https://github.com/NVIDIA/Megatron-LM/tree/7a77abd9b6267dc0020a60b424b4748fc22790bb/megatron/fused_kernels
+            CUDAExtension(
+                name="mstar.scaled_upper_triang_masked_softmax_cuda",
+                include_dirs=megatron_include_dirs,
+                sources=[
+                    "src/mstar/clib/megatron/scaled_upper_triang_masked_softmax.cpp",
+                    "src/mstar/clib/megatron/scaled_upper_triang_masked_softmax_cuda.cu",
+                ],
+                extra_compile_args={"cxx": ["-O3"], "nvcc": fused_softmax_nvcc},
+            ),
+            CUDAExtension(
+                name="mstar.scaled_masked_softmax_cuda",
+                include_dirs=megatron_include_dirs,
+                sources=[
+                    "src/mstar/clib/megatron/scaled_masked_softmax.cpp",
+                    "src/mstar/clib/megatron/scaled_masked_softmax_cuda.cu",
+                ],
+                extra_compile_args={"cxx": ["-O3"], "nvcc": fused_softmax_nvcc},
+            ),
+            CUDAExtension(
+                name="mstar.scaled_softmax_cuda",
+                include_dirs=megatron_include_dirs,
+                sources=[
+                    "src/mstar/clib/megatron/scaled_softmax.cpp",
+                    "src/mstar/clib/megatron/scaled_softmax_cuda.cu",
+                ],
+                extra_compile_args={"cxx": ["-O3"], "nvcc": fused_softmax_nvcc},
+            ),
+            CUDAExtension(
+                name="mstar.fused_mix_prec_layer_norm_cuda",
+                include_dirs=megatron_include_dirs,
+                sources=[
+                    "src/mstar/clib/megatron/layer_norm_cuda.cpp",
+                    "src/mstar/clib/megatron/layer_norm_cuda_kernel.cu",
+                ],
+                extra_compile_args={"cxx": ["-O3"], "nvcc": ["-O3", "--use_fast_math", "-maxrregcount=50"]},
+            ),
+        ]
+    )
 
     cmdclass["build_ext"] = BuildExtension
 else:
-    warnings.warn("Cannot install fused cuda optimizers.")
-
+    warnings.warn("Cannot install optimized CUDA kernels.")
 setup(
     # Metadata
     name='mstar',
     version=VERSION,
     python_requires='>=3.6',
-    description='Package for mstar milestone 1 / 2 development',
+    description='M*',
     long_description_content_type='text/markdown',
 
     # Package info
