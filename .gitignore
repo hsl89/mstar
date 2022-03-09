@@ -32,3 +32,9 @@ dmypy.json
 *.png
 .DS_store
 __pycache__/
+
+# orthers
+.ipynb_checkpoints
+.vscode/
+build/
+*.so
