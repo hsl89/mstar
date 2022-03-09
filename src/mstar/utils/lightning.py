@@ -85,6 +85,6 @@ class AWSBatchProgressBar(ProgressBarBase):
             self._last_batch_end_logged = time.time()
             self.print(
                 f"[Epoch {self._train_epoch_idx} Batch {self._train_batch_idx} "
-                f"It/s {it_per_seconds:.2f} Hours left {(self._total_steps - self._train_batch_idx)/it_per_seconds/3600:.2f}]:",
+                f"It/s {it_per_seconds:.3f} Hours left {(self._total_steps - self._train_batch_idx)/it_per_seconds/3600:.2f}]:",
                 self.trainer.progress_bar_dict,
             )
