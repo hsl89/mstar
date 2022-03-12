@@ -16,8 +16,6 @@ default_tok_cache_path = os.path.join(mstar_cache_home, "tokenizers")
 
 _default_endpoint = "mstar-models"
 MSTAR_RESOLVE_ENDPOINT = os.environ.get("MSTAR_RESOLVE_ENDPOINT", _default_endpoint)
-_default_tok_endpoint = "mstar-tokenizers"
-MSTAR_TOK_RESOLVE_ENDPOINT = os.environ.get("MSTAR_TOK_RESOLVE_ENDPOINT", _default_tok_endpoint)
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +23,8 @@ def get_model_file_from_s3(key, revision="main", bucket_name=MSTAR_RESOLVE_ENDPO
     downloaded_folder = f'{default_cache_path}/{key}/{revision}/'        
     downloaded_model = f'{default_cache_path}/{key}/{revision}/pytorch_model.bin'
     downloaded_config = f'{default_cache_path}/{key}/{revision}/config.json'
-    model_key = f'{key}/{revision}/pytorch_model.bin'
-    config_key = f'{key}/{revision}/config.json'
+    model_key = f'models/{key}/{revision}/pytorch_model.bin'
+    config_key = f'models/{key}/{revision}/config.json'
     path = Path(downloaded_folder)
     path.mkdir(parents=True, exist_ok=True)
     if all([os.path.exists(downloaded_model), os.path.exists(downloaded_config), not force_download]):
@@ -51,6 +49,7 @@ def download_directory_from_s3(bucket_name, remote_folder_name, local_folder):
     if not os.path.exists(local_folder):
         os.makedirs(local_folder)
     for obj in bucket.objects.filter(Prefix = remote_folder_name):
+        local_folder = local_folder.replace("tokenizers", "")
         obj_location = f'{local_folder}/{obj.key}'
         if not os.path.exists(os.path.dirname(obj_location)):
             os.makedirs(os.path.dirname(obj_location))
@@ -59,11 +58,11 @@ def download_directory_from_s3(bucket_name, remote_folder_name, local_folder):
         bucket.download_file(obj.key, obj_location)
 
 
-def get_tokenizer_file_from_s3(key, revision="main", bucket_name=MSTAR_TOK_RESOLVE_ENDPOINT):
+def get_tokenizer_file_from_s3(key, revision="main", bucket_name=MSTAR_RESOLVE_ENDPOINT):
     download_folder = f'{default_tok_cache_path}/'
-    bucket_name = _default_tok_endpoint
+    bucket_name = _default_endpoint
     tokenizer_folder = f"{download_folder}/{key}/{revision}/"
-    download_directory_from_s3(bucket_name, f"{key}/{revision}/", download_folder)
+    download_directory_from_s3(bucket_name, f"tokenizers/{key}/{revision}/", download_folder)
     return tokenizer_folder
     
 
