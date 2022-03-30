@@ -197,6 +197,7 @@ class FusedScaleMaskSoftmax(nn.Module):
         if self.attn_mask_type == AttnMaskType.causal:
             assert sq == sk, "causal mask is only for self attention"
 
+            input = self.mask_func(input, mask) if mask is not None else input
             # input is 3D tensor (attn_batches, sq, sk)
             input = input.view(-1, sq, sk)
             probs = ScaledUpperTriangMaskedSoftmax.apply(input, scale)
