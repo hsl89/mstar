@@ -49,7 +49,7 @@ requirements = [
     'pickle5;python_version<"3.8"',  # pickle protocol 5 for python <= 3.8
     'graphviz',
     # We can also use patched pytorch-lightning branch to add bfloat16 training support
-    'pytorch-lightning>=0.4',
+    'pytorch-lightning>=0.4,<1.6.0',
     'jsonargparse[signatures]@git+https://github.com/leezu/jsonargparse@cf8a40fe2a2d91542d1b2798f065be327f29fcad',  # v3.19 + workaround for https://github.com/PyTorchLightning/pytorch-lightning/issues/9207
     'torchmetrics@git+https://github.com/leezu/metrics@d9ad0ac1ee875cc410fd21b49804b65d592459e3',  # v0.5 + workaround for https://github.com/PyTorchLightning/metrics/issues/484
     'fairscale',

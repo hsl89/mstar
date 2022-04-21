@@ -3,6 +3,7 @@ default:
 
 stages:
   - test
+  - docker
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
@@ -31,3 +32,19 @@ lint:
     - FORCE_CUDA=1 python3 -m pip install -e '.[test]'  --no-build-isolation
     - python3 -m pip install --upgrade enscons pickle5 --no-build-isolation
     - prospector src/
+
+build_push_image:
+  stage: docker
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  tags:
+    - gpu
+  script:
+    - export AWS_SDK_LOAD_CONFIG=true
+    - >-
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/tools/docker/Dockerfile"
+      --destination "747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-gitlab:$CI_COMMIT_REF_NAME"
+      --cache=true
