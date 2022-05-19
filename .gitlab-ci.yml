@@ -1,5 +1,5 @@
 default:
-  image: nvidia/cuda:11.3.1-devel-ubuntu20.04
+  image: nvidia/cuda:11.5.0-devel-ubuntu20.04
 
 stages:
   - test
@@ -15,7 +15,7 @@ pytest:
   script:
     - apt-get update
     - apt-get install -y python3 python3-pip git ninja-build
-    - python3 -m pip install torch==1.10.2+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
+    - python3 -m pip install torch==1.11.0+cu115 -f https://download.pytorch.org/whl/cu115/torch_stable.html
     - FORCE_CUDA=1 python3 -m pip install -e '.[test]'  --no-build-isolation
     - python3 -m pip install --upgrade enscons --no-build-isolation
     - python3 -m pytest ./tests
@@ -28,7 +28,7 @@ lint:
     - apt-get update
     - apt-get install -y python3 python3-pip git ninja-build
     - python3 -m pip install --upgrade prospector pip
-    - python3 -m pip install torch==1.10.2+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
+    - python3 -m pip install torch==1.11.0+cu115 -f https://download.pytorch.org/whl/cu115/torch_stable.html
     - FORCE_CUDA=1 python3 -m pip install -e '.[test]'  --no-build-isolation
     - python3 -m pip install --upgrade enscons pickle5 --no-build-isolation
     - prospector src/
