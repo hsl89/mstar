@@ -58,6 +58,7 @@ requirements = [
     'ujson',
     'seqeval',
     'datasets',
+    'mlflow==1.22.0',
 ]
 
 tests_require = [

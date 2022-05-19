@@ -31,6 +31,9 @@ pylint:
     - raise-missing-from
     - too-many-nested-blocks
     - arguments-differ
+    - import-outside-toplevel
+    - unspecified-encoding
+    - dangerous-default-value
   options:
     generated-members: numpy.*,torch.*
     extension-pkg-allow-list: mstar.fused_optimizers,mstar.scaled_upper_triang_masked_softmax_cuda,mstar.scaled_masked_softmax_cuda,mstar.scaled_softmax_cuda,ujson

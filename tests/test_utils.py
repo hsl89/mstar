@@ -78,3 +78,48 @@ def test_generate_shards(num_objs, num_parts, num_expected):
     all_shards_count = collections.Counter(i for p in parts for i in p)
     assert list(sorted(all_shards_count.keys())) == list(range(num_objs))
     assert min(all_shards_count.values()) == max(all_shards_count.values())
+
+
+def test_mstar_logger(mocker):
+    client = mocker.patch('mstar.utils.lightning.MlflowClient')
+
+    test_run = mocker.MagicMock()
+    test_run.info.run_id = 'run-id-1'
+
+    client().get_experiment_by_name = mocker.MagicMock(return_value=None)
+    client().create_experiment = mocker.MagicMock(return_value='experiment-id')
+    client().create_run = mocker.MagicMock(return_value=test_run)
+
+    # Create new experiment with first run
+    mstar_logger = mstar.utils.lightning.MStarEKSLogger(experiment_name='my-experiment', run_name='first-run')
+    mstar_logger.get_client()
+    assert mstar_logger.name == 'experiment-id'
+    assert mstar_logger.run_id == 'run-id-1'
+
+    test_run2 = mocker.MagicMock()
+    test_run2.info.run_id = 'run-id-2'
+
+    client().create_experiment = mocker.MagicMock(return_value='experiment-id')
+    client().create_run = mocker.MagicMock(return_value=test_run2)
+
+    # Create second run in this experiment
+    mstar_logger2 = mstar.utils.lightning.MStarEKSLogger(experiment_name='my-experiment', run_name='second-run')
+    mstar_logger2.get_client()
+    assert mstar_logger2.name == 'experiment-id'
+    assert mstar_logger2.run_id == 'run-id-2'
+
+    # Test behavior of log_hyperparams
+    mstar_logger2.log_hyperparams({"key": 1.0})
+    mstar_logger2.experiment.log_param.assert_called_once()
+
+    # Test behavior of log_metrics
+    mstar_logger2.log_metrics({"loss": 0.1})
+    mstar_logger2.experiment.log_metric.assert_called_once()
+
+    # Test behavior of log_artifact
+    mstar_logger2.log_artifact("/mnt/pytorch_lightning/bert.pt")
+    mstar_logger2.experiment.log_artifact.assert_called_once()
+
+    # Raise TypeError if metric value is string
+    with pytest.raises(TypeError):
+        mstar_logger2.log_metrics({"loss": 0.1, "loss2": "0.2"})
