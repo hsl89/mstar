@@ -1,0 +1,13 @@
+deepspeed
+pre-commit
+transformers==4.10.0
+datasets==1.11.0
+tqdm
+typing
+absl-py
+s3fs
+boto3
+pytorch_lightning==1.5.4
+git+https://github.com/leezu/metrics@workaround-484#egg=torchmetrics
+https://github.com/leezu/apex/tarball/fc7a3a9bd4e7c5295ca1eca05da83e7a16686087
+ninja
