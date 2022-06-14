@@ -59,6 +59,7 @@ requirements = [
     'seqeval',
     'datasets',
     'mlflow==1.22.0',
+    'protobuf<=3.20.1',
 ]
 
 tests_require = [

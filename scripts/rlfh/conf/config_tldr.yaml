@@ -1,0 +1,17 @@
+defaults:
+  - _self_
+  - datamodule: tldr.yaml
+  - model: sftp.yaml
+  - training: cnndm.yaml
+  
+train_mode: True
+
+EKSArgs:
+  experiment_name: "kaixianl-RLFH"
+  run_name: "v2-sftp-t5small-tldr"
+
+hydra:
+  run:
+    dir: /hdd1/logs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+# T5 small, T5 base SFT and SFTP exps. fine-tune on tldr, zero-shot transfer to cnn/dm

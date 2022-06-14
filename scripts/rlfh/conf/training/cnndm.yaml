@@ -1,0 +1,11 @@
+max_epochs: 3
+val_check_interval: 0.5
+limit_val_batches: null
+max_steps: 100000
+default_root_dir: "/hdd1/logs/${now:%Y-%m-%d}/${now:%H-%M-%S}"
+gpus: 1
+reload_dataloaders_every_n_epochs: 1  # Resample each epoch  
+strategy: "ddp_find_unused_parameters_false"
+accelerator: "gpu"
+replace_sampler_ddp: True
+num_nodes: 1

@@ -1,0 +1,28 @@
+model_type: t5-small
+tokenizer_type: t5-small
+model_class: transformers.T5ForConditionalGeneration
+tokenizer_class: transformers.T5TokenizerFast 
+state_dict: null
+ckpt_path: null 
+pytorch_model_path: null
+pl_modelmodule: scripts.rlfh.model.sft_p.SFTPModel
+
+OptimizerArgs:
+  learning_rate: 1e-5
+  adam_w_mode: True
+  seed: 0
+  loss_beta: 0.1   # pairwise regularization coefficient.  
+  loss_weight: 1   
+  hinge_margin: 1
+
+callbacks:
+  model_checkpoint:
+    _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    every_n_train_steps: null
+    every_n_epochs: 1
+    monitor: "validation_loss" # name of the logged metric which determines when model is improving
+    mode: "min" # "max" means higher metric value is better, can be also "min"
+    save_top_k: 10 # save k best models (determined by above metric)
+    save_last: True # additionaly always save model from last epoch
+    verbose: False
+    auto_insert_metric_name: False

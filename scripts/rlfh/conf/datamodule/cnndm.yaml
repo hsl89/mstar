@@ -1,0 +1,13 @@
+batch_size: 16
+max_seq_len: 512 
+summary_max_seq_len: 128
+num_beams: 4
+repetition_penalty: 1.2
+length_penalty: 0.6
+early_stopping: True 
+num_workers: 4
+test_batch_size: 64
+test_distributed_mode: True # set this as true during training for distributed evaluation.
+dataset_name: "ccdv/cnn_dailymail" # reddit
+test_dataset_name: "ccdv/cnn_dailymail" # reddit
+datamodule_class: scripts.rlfh.datamodule.data.PlDataModule
