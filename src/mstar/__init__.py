@@ -6,5 +6,6 @@ from . import optimizers
 from . import uf_format
 from . import utils
 from . import megatron
+from . import tokenizers
 
-__all__ = ['models', 'layers', 'optimizers', 'utils', 'uf_format', 'megatron']
+__all__ = ['models', 'layers', 'optimizers', 'utils', 'uf_format', 'megatron', 'tokenizers']

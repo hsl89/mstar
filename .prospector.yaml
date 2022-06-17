@@ -31,6 +31,8 @@ pylint:
     - raise-missing-from
     - too-many-nested-blocks
     - arguments-differ
+    - arguments-renamed
+    - deprecated-method
     - import-outside-toplevel
     - unspecified-encoding
     - dangerous-default-value

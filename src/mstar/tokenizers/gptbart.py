@@ -15,9 +15,7 @@
 
 
 import os
-import sys
 from contextlib import contextmanager
-from functools import lru_cache
 from shutil import copyfile
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -227,7 +225,7 @@ class GPT2BartTokenizer(PreTrainedTokenizer):
         self, save_directory: str, filename_prefix: Optional[str] = None
     ) -> Tuple[str]:
         if not os.path.isdir(save_directory):
-            logger.error(f"Vocabulary path ({save_directory}) should be a directory")
+            logger.error("Vocabulary path (%s) should be a directory", save_directory)
             return
         out_vocab_file = os.path.join(
             save_directory,

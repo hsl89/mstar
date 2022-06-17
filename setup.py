@@ -40,7 +40,7 @@ requirements = [
     'regex',
     'requests',
     'pyarrow>=3',
-    'transformers>=4.3.0',
+    'transformers>=4.18.0',
     'tokenizers>=0.10.2',  # 0.10.1 is buggy
     'tensorboard',
     'pandas',
