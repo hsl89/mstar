@@ -6,5 +6,6 @@ from . import torch
 from . import registry
 from . import shm
 from . import data
+from . import flops_calc
 
-__all__ = ['misc', 'lightning', 'executors', 'torch', 'registry', 'shm', 'data']
+__all__ = ['misc', 'lightning', 'executors', 'torch', 'registry', 'shm', 'data', 'flops_calc']

@@ -13,7 +13,8 @@ import mstar
     (90, 0.5, 2, 95, 2.7),  # wait if busy
     (90, 10, 20, 5, 0.3),   # no wait if not busy
 ])
-def test_wait_if_busy(mocker, max_cpu, jitter, max_time, current_cpu, expected_max_wait):
+def test_wait_if_busy(mocker, max_cpu, jitter, max_time,
+                      current_cpu, expected_max_wait):
     mocker.patch('psutil.cpu_percent', return_value=current_cpu)
 
     @mstar.utils.misc.wait_if_busy(max_cpu, jitter, max_time)
@@ -24,7 +25,7 @@ def test_wait_if_busy(mocker, max_cpu, jitter, max_time, current_cpu, expected_m
     func_call(1, b=2)
     toc = time.time()
 
-    assert toc-tic <= expected_max_wait
+    assert toc - tic <= expected_max_wait
 
 
 @pytest.mark.parametrize('env_vars', [
@@ -55,7 +56,9 @@ def test_list_matched_s3_objects(mocker, all_keys,
     for k in all_keys:
         client.put_object(Bucket=bucket, Key=k, Body='test content.')
 
-    got = set(mstar.utils.misc.list_matched_s3_objects(bucket, prefix, pattern))
+    got = set(
+        mstar.utils.misc.list_matched_s3_objects(
+            bucket, prefix, pattern))
     assert got == expected
 
 
@@ -91,7 +94,8 @@ def test_mstar_logger(mocker):
     client().create_run = mocker.MagicMock(return_value=test_run)
 
     # Create new experiment with first run
-    mstar_logger = mstar.utils.lightning.MStarEKSLogger(experiment_name='my-experiment', run_name='first-run')
+    mstar_logger = mstar.utils.lightning.MStarEKSLogger(
+        experiment_name='my-experiment', run_name='first-run')
     mstar_logger.get_client()
     assert mstar_logger.name == 'experiment-id'
     assert mstar_logger.run_id == 'run-id-1'
@@ -103,7 +107,8 @@ def test_mstar_logger(mocker):
     client().create_run = mocker.MagicMock(return_value=test_run2)
 
     # Create second run in this experiment
-    mstar_logger2 = mstar.utils.lightning.MStarEKSLogger(experiment_name='my-experiment', run_name='second-run')
+    mstar_logger2 = mstar.utils.lightning.MStarEKSLogger(
+        experiment_name='my-experiment', run_name='second-run')
     mstar_logger2.get_client()
     assert mstar_logger2.name == 'experiment-id'
     assert mstar_logger2.run_id == 'run-id-2'
@@ -123,3 +128,53 @@ def test_mstar_logger(mocker):
     # Raise TypeError if metric value is string
     with pytest.raises(TypeError):
         mstar_logger2.log_metrics({"loss": 0.1, "loss2": "0.2"})
+
+
+def test_flops_calculator():
+
+    test_decoder_config = {
+        'model_type': 'decoder',
+        'activation_checkpointing': True,
+        'vocab_size': 50257,
+        'hidden_size': 2048,
+        'decoder_num_layers': 24,
+        'decoder_seq_len': 2048,
+        'micro_batchsize': 16,
+        'sec_per_step': 4.4,
+    }
+
+    decoder_tflops = 88.56
+
+    decoder_with_checkpointing_tflops = mstar.utils.flops_calc.compute_tflops_per_gpu(
+        **test_decoder_config)
+    decoder_diff = math.sqrt(
+        (decoder_with_checkpointing_tflops -
+            decoder_tflops)**2)
+
+    assert decoder_diff < 1e-1
+
+    test_decoder_config['activation_checkpointing'] = False
+    decoder_no_checkpointing_tflops = mstar.utils.flops_calc.compute_tflops_per_gpu(
+        **test_decoder_config)
+    # no checkpointing requires fewer operations
+    assert decoder_no_checkpointing_tflops < decoder_with_checkpointing_tflops
+
+    test_encoder_decoder_config = {
+        'model_type': 'encoder_decoder',
+        'activation_checkpointing': True,
+        'vocab_size': 50257,
+        'hidden_size': 2048,
+        'decoder_num_layers': 12,
+        'encoder_num_layers': 12,
+        'encoder_seq_len': 2048,
+        'decoder_seq_len': 2048,
+        'micro_batchsize': 16,
+        'sec_per_step': 4.4,
+    }
+
+    encoder_decoder_tflops = mstar.utils.flops_calc.compute_tflops_per_gpu(
+        **test_encoder_decoder_config)
+
+    # should exceed decoder-only with same num_layers,hidden size,seq_len
+    # due to additional cross-attention
+    assert encoder_decoder_tflops > decoder_tflops
