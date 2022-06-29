@@ -37,19 +37,19 @@ RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/var/lib/
     apt-get update && apt-get install -y nvidia-fabricmanager-470 datacenter-gpu-manager && \
     apt-get purge --allow-change-held-packages -y libnccl2 libnccl-dev && \
     cd /usr/local/src && \
-    wget https://efa-installer.amazonaws.com/aws-efa-installer-1.15.0.tar.gz && \
-    tar -xf aws-efa-installer-1.15.0.tar.gz && \
+    wget https://efa-installer.amazonaws.com/aws-efa-installer-1.15.2.tar.gz && \
+    tar -xf aws-efa-installer-1.15.2.tar.gz && \
     cd aws-efa-installer && \
     ./efa_installer.sh -y -g -d --skip-kmod --skip-limit-conf --no-verify && \
     cd /usr/local/src && rm -rf aws-efa-installer-latest.tar.gz aws-efa-installer && \
-    cd /usr/local/src && git clone -b v2.12.10-1 https://github.com/NVIDIA/nccl.git && cd nccl && \
+    cd /usr/local/src && git clone -b v2.12.12-1 https://github.com/NVIDIA/nccl.git && cd nccl && \
     make -j src.build CUDA_HOME=/usr/local/cuda \
       NVCC_GENCODE="-gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_75,code=sm_75 -gencode=arch=compute_70,code=sm_70" && \
       make install && \
     git clone -b aws https://github.com/aws/aws-ofi-nccl.git /opt/aws-ofi-nccl && \
     cd /opt/aws-ofi-nccl && \
-    # Pre-release with nccl 2.12 support
-    git checkout a71ff8baa945c40df780e665221ec4f5c234a138 && \
+    # v1.2.0 + EFA -FI_EAGAIN fix + nccl 2.12 fix
+    git checkout 06b5390f1dc06a2b598954a3b0dd10fb8398f46e && \
     ./autogen.sh && \
     ./configure --prefix=/opt/aws-ofi-nccl/install \
       --with-libfabric=/opt/amazon/efa/ \
