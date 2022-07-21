@@ -169,6 +169,7 @@ def test_flops_calculator():
         'encoder_seq_len': 2048,
         'decoder_seq_len': 2048,
         'micro_batchsize': 16,
+        'use_gated_mlp': True,
         'sec_per_step': 4.4,
     }
 
