@@ -1,0 +1,18 @@
+model_type: t5-large
+tokenizer_type: t5-large
+model_class: transformers.T5ForConditionalGeneration
+tokenizer_class: transformers.T5TokenizerFast 
+state_dict: null
+ckpt_path: null 
+pytorch_model_path: null
+pl_modelmodule: scripts.rlfh.model.model_inference.InferenceModel
+type_hf: "normal"  # random; negative; normal; do we randomized human feedback.
+policy_name: "t5_large"
+
+OptimizerArgs:
+  learning_rate: 1e-5
+  adam_w_mode: True
+  seed: 0
+  loss_beta: 0   # pairwise regularization coefficient.
+  loss_weight: 1     
+  hinge_margin: 1

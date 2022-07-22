@@ -1,0 +1,17 @@
+defaults:
+  - _self_
+  - datamodule: privacy.yaml
+  - model: inference_t5large.yaml
+  - training: cnndm.yaml # place holder, not used for inference.
+
+train_mode: False
+
+EKSArgs:
+  experiment_name: "kaixianl-RLFH"
+  run_name: "Zeroshot-t5-legal"
+
+hydra:
+  run:
+    dir: /hdd1/logs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+# Generating summary for https://github.com/senjed/Summarization-of-Privacy-Policies dataset

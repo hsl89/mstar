@@ -1,0 +1,25 @@
+name: "RLFH-t5"
+node_type: "p4d.24xlarge"
+node_num: 1
+image: 747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-eks:kaixianl-rlfh-inference-p4
+command: ["CUDA_VISIBLE_DEVICES=1", 
+          "/usr/bin/python3", 
+          "scripts/rlfh/train.py",
+          "-cn=config_privacy",
+          "training.default_root_dir=/mnt_out/kaixianl/logs/${now:%Y-%m-%d}/${now:%H-%M-%S}",
+          "hydra.run.dir=/mnt_out/kaixianl/logs/${now:%Y-%m-%d}/${now:%H-%M-%S}",
+          "training.gpus=1",
+          "datamodule.test_data_path=/mnt/rlfh/Summarization-of-Privacy-Policies/TOSDR_full_content_au_labeled_v2_128_512.json",
+          "datamodule.generated_summary_path=/mnt_out/rlfh/temp/generated_TOSDR_full_content_au_labeled_v2_t53b.json",
+          "datamodule.test_batch_size=1", 
+          "EKSArgs.experiment_name=kaixianl-RLFH",
+          "training.strategy=null",
+          "model.policy_name=t5_3b_0",
+          "model.model_type=t5-3b",
+          "model.tokenizer_type=t5-3b",
+          "EKSArgs.run_name=Zeroshot-t5-3b-privacy",
+          ]
+args: [
+]
+
+# Inference of t5-large and t5-3b model for summary generation on EDT dataset

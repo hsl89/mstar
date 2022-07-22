@@ -1,23 +1,9 @@
-import json 
+import os 
 import torch as th
 from torch.utils.data import DataLoader, Dataset, SequentialSampler
 import pytorch_lightning as pl
-from scripts.rlfh.utils.data_utils import compute_indices
+from scripts.rlfh.utils.data_utils import compute_indices, load_humanfeedback_data, load_jsonl
 
-
-def load_jsonl(gcs_path):
-    with open(gcs_path, "rb") as f:
-        datas = [json.loads(l) for l in f.readlines()]
-    return datas
-
-def load_humanfeedback_data(path):
-    batch_ids = list(range(3,21)) 
-    batch_ids.append(22)
-    hf_data = []
-    for bid in batch_ids:
-        hf_batch_file = f"{path}/batch{bid}.json"
-        hf_data.extend([json.loads(line) for line in open(hf_batch_file,'r')])
-    return hf_data
 
 class OpenAIFilteredTLDRdataset(Dataset):
     def __init__(self, 

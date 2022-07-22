@@ -1,0 +1,17 @@
+batch_size: 4
+max_seq_len: 512 
+summary_max_seq_len: 128
+num_beams: 4
+repetition_penalty: 1.2
+length_penalty: 0.6
+early_stopping: True
+num_workers: 0
+test_batch_size: 64
+test_distributed_mode: True # set this as true during training for distributed evaluation.
+dataset_name: "reddit"  
+test_dataset_name: "ccdv/cnn_dailymail" 
+train_data_path: "/hdd1/data/summarize-from-feedback/tldr-openai-filtered/train_remove_hfids.jsonl"
+test_data_path: "/hdd1/data/summarize-from-feedback/tldr-openai-filtered/test.jsonl"
+valid_data_path: "/hdd1/data/summarize-from-feedback/tldr-openai-filtered/valid.jsonl"
+train_hf_data_path: "/hdd1/data/summarize-from-feedback/aligned_hf/train.json"
+datamodule_class: scripts.rlfh.datamodule.data_alignedhf.SFTPAlignedDataModule

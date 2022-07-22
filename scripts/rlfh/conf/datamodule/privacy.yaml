@@ -1,0 +1,16 @@
+batch_size: 4
+max_seq_len: 512 
+summary_max_seq_len: 128
+num_beams: 4
+repetition_penalty: 1.2
+length_penalty: 0.6
+early_stopping: True
+num_workers: 0
+test_batch_size: 8
+test_distributed_mode: False # set this as true during training for distributed evaluation.
+generated_summary_path: "/hdd1/data/Summarization-of-Privacy-Policies/generated_summaries/TOSDR_full_content_au_labeled_v2_128_512.json"
+test_data_path: "/hdd1/data/Summarization-of-Privacy-Policies/TOSDR_full_content_au_labeled_v2_128_512.json"
+datamodule_class: scripts.rlfh.datamodule.data_legal.InferenceDataModule
+post_key: "text"
+summary_key: "reference_summary"
+uid_key: 'uid'

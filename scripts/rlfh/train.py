@@ -9,7 +9,7 @@ from typing import List, Optional
 from pytorch_lightning import Callback
 from pytorch_lightning.loggers import TensorBoardLogger
 
-@hydra.main(config_path="conf", config_name="config_tldr_large")
+@hydra.main(config_path="conf", config_name="config_legal")
 def main(cfg):
     print(OmegaConf.to_yaml(cfg))
     working_dir = os.getcwd()
@@ -88,13 +88,17 @@ def main(cfg):
         user_log_dict = { "working_dir": working_dir}
         mstar_logger.log_env_as_artifact(user_log_dict)
         mstar_logger.log_hyperparams(cfg)
-    trainer.fit(model_module, data_module)        
+    if cfg.train_mode:
+        trainer.fit(model_module, data_module)        
 
     ## Test
-    assert isinstance(callbacks[0], pl.callbacks.ModelCheckpoint)
-    logger.info(f"Best ckpt path: {callbacks[0].best_model_path}")
-    trainer.test(ckpt_path=callbacks[0].best_model_path, 
-                dataloaders=data_module.test_dataloader())
+    if cfg.train_mode:
+        assert isinstance(callbacks[0], pl.callbacks.ModelCheckpoint)
+        logger.info(f"Best ckpt path: {callbacks[0].best_model_path}")
+        trainer.test(ckpt_path=callbacks[0].best_model_path, 
+                    dataloaders=data_module.test_dataloader())
+    else:
+        trainer.test(model=model_module, dataloaders=data_module.test_dataloader())
 
 
 if __name__ == "__main__":

@@ -1,0 +1,7 @@
+name: "kaixianl-p4-dev"
+node_type: "p4d.24xlarge"
+gpu: 8
+node_num: 1
+image:  747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-eks:kaixianl-rlfh-inference-p4
+env:
+  ALIAS: kaixianl%

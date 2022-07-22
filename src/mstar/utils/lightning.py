@@ -11,7 +11,7 @@ from pytorch_lightning.callbacks.progress import ProgressBarBase
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers.base import LightningLoggerBase, rank_zero_experiment
 from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn
-
+from pytorch_lightning.utilities.logger import _convert_params, _flatten_dict
 from mlflow.tracking import context, MlflowClient
 from mlflow.utils.mlflow_tags import MLFLOW_RUN_NAME
 
@@ -120,7 +120,7 @@ class AWSBatchProgressBar(ProgressBarBase):
         self._train_epoch_idx += 1
         self._last_batch_end_logged = time.time()
 
-    def on_train_batch_end(  # pylint: disable=unused-argument
+    def on_train_batch_end(  # pylint: disable=unused-argument, arguments-renamed
         self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
     ):
         self._train_batch_idx += 1
@@ -197,8 +197,8 @@ class MStarEKSLogger(LightningLoggerBase):
 
     @rank_zero_only
     def log_hyperparams(self, params: Union[Dict[str, Any], Namespace]) -> None:
-        params = self._convert_params(params)
-        params = self._flatten_dict(params)
+        params = _convert_params(params)
+        params = _flatten_dict(params)
         for k, v in params.items():
             if len(str(v)) > 250:
                 rank_zero_warn(
@@ -246,7 +246,7 @@ class MStarEKSLogger(LightningLoggerBase):
             self.experiment.set_terminated(self.run_id, status)
 
     @rank_zero_only
-    def log_env_as_artifact(self) -> None:
+    def log_env_as_artifact(self, user_log_dict: Optional[Dict] = None) -> None: # pylint: disable=too-many-statements
         import urllib.request
         cur_path = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
         try:
@@ -292,6 +292,17 @@ class MStarEKSLogger(LightningLoggerBase):
             self.log_artifact(other_meta_data)
         except Exception as e:
             logger.warning("Failed to log internal metadata...")
+        
+        if user_log_dict is not None:
+            try:
+                user_input_json = cur_path + '/user_meta_data.json'
+                meta_data = user_log_dict
+                logger.info("Logging user metadata as artifact...")
+                with open(user_input_json, 'w') as f:
+                    json.dump(meta_data, f)
+                self.log_artifact(user_input_json)
+            except Exception as e:
+                logger.warning("Failed to log user metadata...")
 
         try:
             git_info_file = cur_path + '/git_info.json'

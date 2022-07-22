@@ -1,9 +1,10 @@
-from scripts.rlfh.model.model import PlModel
+from scripts.rlfh.model.sft_p import SFTPModel
 from scripts.rlfh.utils.model_utils import get_logp
 import torch as th
 
 
-class SFTPModel(PlModel):
+
+class SFTPAlignedModel(SFTPModel):
     def __init__(
         self,
         model,
@@ -20,16 +21,18 @@ class SFTPModel(PlModel):
         self.loss_beta = model_args.OptimizerArgs.loss_beta
         self.loss_weight = model_args.OptimizerArgs.loss_weight
         self.margin = model_args.OptimizerArgs.hinge_margin
+        self.hf_sample_ratio = model_args.OptimizerArgs.hf_sample_ratio
         self.type_hf = model_args.type_hf
+        
     
     def training_step(self, batch, batch_idx):
         # Supervised loss.
         loss = self._compute_sl_loss(batch)
         
-        if self.loss_beta > 0:
+        if self.hf_sample_ratio > 0:
             # Human feedback loss
-            hinge_loss, log_prob_summary_i, log_prob_summary_p = self._compute_hf_loss(batch)
-            train_loss = self.loss_weight * loss + self.loss_beta * hinge_loss
+            hf_loss, hinge_loss, log_prob_summary_i, log_prob_summary_p = self._compute_hf_loss(batch)
+            train_loss = self.loss_weight * loss + (self.loss_beta * hinge_loss + hf_loss) * self.hf_sample_ratio
             
             log_dict = {
                 "train_loss_sl": loss, 
@@ -44,27 +47,6 @@ class SFTPModel(PlModel):
             self.log("training_loss", loss, prog_bar=True, logger=True)
         return loss
     
-    def _compute_sl_loss(self, batch):
-        input_ids = batch["sl"]["input_ids"]
-        input_ids = input_ids.view(-1, input_ids.size()[-1]) 
-        # Reshape from [batch_size, 1, max_seq_len] to [batch_size, max_seq_len]
-        attention_mask = batch["sl"]["attention_mask"]
-        label_attention_mask = batch["sl"]["labels_attention_mask"]
-        labels = batch["sl"]["labels"] 
-        outputs = self.model(input_ids=input_ids, 
-                                   attention_mask=attention_mask, 
-                                   decoder_attention_mask=label_attention_mask,
-                                   labels=labels)
-        # loss = outputs.loss
-        num_nonpad_tokens = th.sum(labels[..., 1:].contiguous() != -100)
-        num_nonpad_tokens = num_nonpad_tokens.double()
-        loss = outputs.loss * num_nonpad_tokens
-
-        th.distributed.all_reduce(loss)
-        th.distributed.all_reduce(num_nonpad_tokens)
-        loss = loss / num_nonpad_tokens
-        return loss
-    
     def _compute_hf_loss(self, batch):
         input_ids_hf = batch["hf"]["input_ids"]
         input_ids_hf = input_ids_hf.view(-1, input_ids_hf.size()[-1]) 
@@ -75,6 +57,8 @@ class SFTPModel(PlModel):
         summary_preferred_attention_mask = batch["hf"]["summary_preferred_attention_mask"]
         summary_preferred_ids = batch["hf"]["summary_preferred_ids"] 
         
+        label_attention_mask = batch["hf"]["summary_groundtruth_attention_mask"]
+        labels = batch["hf"]["summary_groundtruth_ids"]
         output_i = self.model(input_ids=input_ids_hf, 
                                 attention_mask=attention_mask_hf, 
                                 decoder_attention_mask=summary_i_attention_mask,
@@ -84,6 +68,18 @@ class SFTPModel(PlModel):
                                 attention_mask=attention_mask_hf, 
                                 decoder_attention_mask=summary_preferred_attention_mask,
                                 labels=summary_preferred_ids)
+        
+        outputs = self.model(input_ids=input_ids_hf, 
+                            attention_mask=attention_mask_hf, 
+                            decoder_attention_mask=label_attention_mask,
+                            labels=labels)
+        
+        num_nonpad_tokens = th.sum(labels[..., 1:].contiguous() != -100)
+        num_nonpad_tokens = num_nonpad_tokens.double()
+        loss = outputs.loss * num_nonpad_tokens
+        th.distributed.all_reduce(loss)
+        th.distributed.all_reduce(num_nonpad_tokens)
+        loss = loss / num_nonpad_tokens
         
         log_prob_summary_i = get_logp(output_i.logits, summary_i_ids, summary_i_attention_mask)
         log_prob_summary_p = get_logp(output_p.logits, summary_preferred_ids, summary_preferred_attention_mask)
@@ -98,4 +94,5 @@ class SFTPModel(PlModel):
         log_probs[log_probs<0] = 0
         hinge_loss = th.mean(log_probs)
         th.distributed.all_reduce(hinge_loss)
-        return hinge_loss, log_prob_summary_i, log_prob_summary_p
+        
+        return loss, hinge_loss, log_prob_summary_i, log_prob_summary_p

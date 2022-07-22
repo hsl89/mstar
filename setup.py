@@ -49,7 +49,7 @@ requirements = [
     'pickle5;python_version<"3.8"',  # pickle protocol 5 for python <= 3.8
     'graphviz',
     # We can also use patched pytorch-lightning branch to add bfloat16 training support
-    'pytorch-lightning>=0.4,<1.6.0',
+    'pytorch_lightning==1.6.3',
     'jsonargparse[signatures]@git+https://github.com/leezu/jsonargparse@cf8a40fe2a2d91542d1b2798f065be327f29fcad',  # v3.19 + workaround for https://github.com/PyTorchLightning/pytorch-lightning/issues/9207
     'torchmetrics@git+https://github.com/leezu/metrics@d9ad0ac1ee875cc410fd21b49804b65d592459e3',  # v0.5 + workaround for https://github.com/PyTorchLightning/metrics/issues/484
     'fairscale',
@@ -70,8 +70,23 @@ tests_require = [
     'lorem',
 ]
 
+rlfh_require = [
+    "transformers==4.18.0",
+    "datasets==2.1.0",
+    "numpy",
+    "dataclasses",
+    "typing",
+    "absl-py",
+    'hydra-core',
+    "rouge-score",
+    "sacrebleu<2.0",
+    "nltk==3.6.5",
+    "protobuf==3.20.1"
+]
+
 extras = {
     'test': tests_require,
+    'rlfh': rlfh_require
 }
 force_cuda = os.getenv("FORCE_CUDA", "0") == "1"
 extensions = []
@@ -168,6 +183,7 @@ setup(
     include_package_data=True,
     install_requires=requirements,
     tests_require=tests_require,
+    rlfh_require=rlfh_require,
     extras_require=extras,
     ext_modules=extensions,
     cmdclass=cmdclass,

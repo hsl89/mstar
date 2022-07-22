@@ -6,6 +6,7 @@ state_dict: null
 ckpt_path: null 
 pytorch_model_path: null
 pl_modelmodule: scripts.rlfh.model.sft_p.SFTPModel
+type_hf: "normal"  # random; negative; normal; do we randomized human feedback.
 
 OptimizerArgs:
   learning_rate: 1e-5

@@ -5,7 +5,7 @@ tokenizer_class: transformers.T5TokenizerFast
 state_dict: null
 ckpt_path: null 
 pytorch_model_path: null
-pl_modelmodule: scripts.rlfh.model.sft_p.SFTPModel
+pl_modelmodule: scripts.rlfh.model.sftp_aligned.SFTPAlignedModel
 type_hf: "normal"  # random; negative; normal; do we randomized human feedback.
 
 OptimizerArgs:
@@ -15,6 +15,7 @@ OptimizerArgs:
   loss_beta: 0.1   # pairwise regularization coefficient.  
   loss_weight: 1   
   hinge_margin: 1
+  hf_sample_ratio: 0.08 # ratio of sl loss vs hf loss
 
 callbacks:
   model_checkpoint:

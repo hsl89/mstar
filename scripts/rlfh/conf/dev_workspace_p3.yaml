@@ -1,0 +1,7 @@
+name: "linkaixi-p3-dev"
+node_type: "p3dn.24xlarge"
+gpu: 8
+node_num: 1
+image: 747303060528.dkr.ecr.us-west-2.amazonaws.com/mstar-eks:kaixianl-rlfh-p3
+env:
+  ALIAS: linkaixi

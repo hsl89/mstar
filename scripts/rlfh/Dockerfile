@@ -97,16 +97,11 @@ RUN --mount=target=/mnt  --mount=type=cache,target=/root/.cache/pip\
     git clone --recursive /mnt /usr/local/src/mstar && \
     cd /usr/local/src/mstar && \
     git remote remove origin && \
-    TORCH_CUDA_ARCH_LIST="8.0 7.5" FORCE_CUDA=1 python3 -m pip install -r requirements.txt --no-build-isolation
+    TORCH_CUDA_ARCH_LIST="8.0 7.5" FORCE_CUDA=1 python3 -m pip install -e "/usr/local/src/mstar[rlfh]" --no-build-isolation
 
 
 ENV PYTHONPATH "${PYTHONPATH}:/usr/local/src/mstar"
 
-# Copy the source code and install 
-RUN mkdir -p /usr/local/src/mstar
-COPY . /usr/local/src/mstar/
-RUN cd /usr/local/src/mstar && \
-    TORCH_CUDA_ARCH_LIST="8.0" FORCE_CUDA=1 python3 -m pip install /usr/local/src/mstar --no-build-isolation
 
 WORKDIR /usr/local/src/mstar
 COPY tools/distributed-training/entrypoint.sh /usr/local/entrypoint.sh
