@@ -1,13 +1,19 @@
 import os
+import copy
+import json
 from shutil import copyfile
 from transformers import MT5TokenizerFast
 from transformers.tokenization_utils import PreTrainedTokenizer
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast, PreTrainedTokenizerBase
 from transformers.convert_slow_tokenizer import SpmConverter
-from tokenizers import processors
+from tokenizers import processors, AddedToken
 import sentencepiece as spm
 
 VOCAB_FILES_NAMES = {"vocab_file": "spiece.model", "tokenizer_file": "tokenizer.json"}
+
+SPECIAL_TOKENS_MAP_FILE = "special_tokens_map.json"
+TOKENIZER_CONFIG_FILE = "tokenizer_config.json"
+TOKENIZER_FILE = "tokenizer.json"
 
 # Not using tokenizer
 
@@ -110,7 +116,7 @@ class ATMTokenizerFast(PreTrainedTokenizerFast):
         return ATMConverter(slow_tokenizer, create_type_ids=create_token_type_id).converted()
 
     # pylint: disable=signature-differs
-    def save_vocabulary(self, save_directory, filename_prefix):
+    def save_vocabulary(self, save_directory, filename_prefix=None):
         if not os.path.isdir(save_directory):
             print(f"ERROR: Vocabulary path ({save_directory}) should be a directory")
             return
@@ -123,6 +129,67 @@ class ATMTokenizerFast(PreTrainedTokenizerFast):
             print(f"Copy vocab file to {out_vocab_file}")
 
         return (out_vocab_file,)
+    
+
+    def save_pretrained(self, save_directory, filename_prefix=None):
+        if os.path.isfile(save_directory):
+            print(f"Provided path ({save_directory}) should be a directory, not a file")
+            return
+        
+        os.makedirs(save_directory, exist_ok=True)
+        special_tokens_map_file = os.path.join(
+            save_directory, (filename_prefix + "-" if filename_prefix else "") + SPECIAL_TOKENS_MAP_FILE
+        )
+        tokenizer_config_file = os.path.join(
+            save_directory, (filename_prefix + "-" if filename_prefix else "") + TOKENIZER_CONFIG_FILE
+        )
+
+        tokenizer_config = copy.deepcopy(self.init_kwargs)
+        if len(self.init_inputs) > 0:
+            tokenizer_config["init_inputs"] = copy.deepcopy(self.init_inputs)
+        for file_id in self.vocab_files_names:
+            tokenizer_config.pop(file_id, None)
+
+        # Sanitize AddedTokens
+        def convert_added_tokens(obj, add_type_field=True):
+            if isinstance(obj, AddedToken):
+                out = obj.__getstate__()
+                if add_type_field:
+                    out["__type"] = "AddedToken"
+                return out
+            elif isinstance(obj, (list, tuple)):
+                return list(convert_added_tokens(o, add_type_field=add_type_field) for o in obj)
+            elif isinstance(obj, dict):
+                return {k: convert_added_tokens(v, add_type_field=add_type_field) for k, v in obj.items()}
+            return obj
+        
+        tokenizer_config = convert_added_tokens(tokenizer_config, add_type_field=True)
+        tokenizer_class = self.__class__.__name__
+        tokenizer_config["tokenizer_class"] = tokenizer_class
+
+        with open(tokenizer_config_file, "w", encoding="utf-8") as f:
+            out_str = json.dumps(tokenizer_config, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+            f.write(out_str)
+        print(f"tokenizer config file saved in {tokenizer_config_file}")
+
+        write_dict = convert_added_tokens(self.special_tokens_map_extended, add_type_field=False)
+
+        with open(special_tokens_map_file, "w", encoding="utf-8") as f:
+            out_str = json.dumps(write_dict, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+            f.write(out_str)
+        print(f"Special tokens file saved in {special_tokens_map_file}")
+
+        file_names = (tokenizer_config_file, special_tokens_map_file)
+
+        tokenizer_file = os.path.join(
+            save_directory, (filename_prefix + "-" if filename_prefix else "") + TOKENIZER_FILE
+        )
+        self.backend_tokenizer.save(tokenizer_file)
+        file_names = file_names + (tokenizer_file,)
+
+        vocab_files = self.save_vocabulary(save_directory, filename_prefix=filename_prefix)
+
+        return file_names + vocab_files
     # pylint: enable=signature-differs
 
 class MT5TokenizerFastWithMask(MT5TokenizerFast):

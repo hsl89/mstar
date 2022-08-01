@@ -28,4 +28,12 @@ def test_get_model_file_from_s3():
     assert "78d21f863d09a1b64b1f9921727454e2" == get_md5sum(downloaded_folder+"/config.json")
     assert os.path.exists(downloaded_folder+"/config.json")
     assert os.path.exists(downloaded_folder+"/pytorch_model.bin")
-    
+
+
+def test_auto_tokenizer_save_load():
+    """Functional test of loading tokenizer from s3 bucket, saving to local and loading from local"""
+    local_path = "./saved_tokenizer"
+    tokenizer = tok_from_pretrained("atm-PreLNSeq2Seq-5B")
+    tokenizer.save_pretrained(local_path)
+    tokenizer2 = tok_from_pretrained(local_path)
+    assert tokenizer("hello world") == tokenizer2("hello world")
