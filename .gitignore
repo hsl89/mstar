@@ -37,4 +37,5 @@ __pycache__/
 .ipynb_checkpoints
 .vscode/
 build/
+dist/
 *.so

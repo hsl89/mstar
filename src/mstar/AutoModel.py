@@ -67,6 +67,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
     # Shared args among mstar and hf models.
     force_download = kwargs.get("force_download", None)
     revision = kwargs.get("revision", 'main')
+    cache_dir = kwargs.get("cache_dir", None)
     model = None
     if os.path.isdir(pretrained_model_name_or_path):
         # Load config file.
@@ -87,7 +88,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
         key = pretrained_model_name_or_path
         if model_type not in config_dict:
             if model_type.startswith("mstar") or model_type.startswith("atm"):
-                downloaded_folder = get_model_file_from_s3(key, revision, force_download=force_download)
+                downloaded_folder = get_model_file_from_s3(key, revision, force_download=force_download, cache_dir=cache_dir)
                 print(f"Loading mstar model {key}")
                 config_path = f"{downloaded_folder}/config.json"
                 with open(config_path, encoding='utf-8') as infile:
@@ -102,7 +103,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
         AutoModel.register(config_dict[model_type], model_class_dict[model_type])    
 
         # Downlaod from s3. 
-        downloaded_folder = get_model_file_from_s3(key, revision, force_download=force_download)
+        downloaded_folder = get_model_file_from_s3(key, revision, force_download=force_download, cache_dir=cache_dir)
         print(f"Loading mstar model {key}")
         model = AutoModel.from_pretrained(downloaded_folder)  
     return model

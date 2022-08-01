@@ -10,19 +10,19 @@ import hashlib
 mstar_cache_home = os.path.expanduser(
     os.getenv("MSTAR_HOME", os.path.join(os.getenv("XDG_CACHE_HOME", "~/.cache"), "mstar"))
 )
-default_cache_path = os.path.join(mstar_cache_home, "transformers")
-default_tok_cache_path = os.path.join(mstar_cache_home, "tokenizers")
-
 
 _default_endpoint = "mstar-models"
 MSTAR_RESOLVE_ENDPOINT = os.environ.get("MSTAR_RESOLVE_ENDPOINT", _default_endpoint)
 
 logger = logging.getLogger(__name__)
 
-def get_model_file_from_s3(key, revision="main", bucket_name=MSTAR_RESOLVE_ENDPOINT, force_download=False):    
-    downloaded_folder = f'{default_cache_path}/{key}/{revision}/'        
-    downloaded_model = f'{default_cache_path}/{key}/{revision}/pytorch_model.bin'
-    downloaded_config = f'{default_cache_path}/{key}/{revision}/config.json'
+def get_model_file_from_s3(key, revision="main", bucket_name=MSTAR_RESOLVE_ENDPOINT, force_download=False, cache_dir=None):    
+    cache_dir = cache_dir or mstar_cache_home
+    cache_dir = os.path.join(cache_dir,  "transformers")
+    downloaded_folder = os.path.join(cache_dir, key, revision)
+    downloaded_model = os.path.join(downloaded_folder, 'pytorch_model.bin')
+    downloaded_config = os.path.join(downloaded_folder, 'config.json')
+
     model_key = f'models/{key}/{revision}/pytorch_model.bin'
     config_key = f'models/{key}/{revision}/config.json'
     path = Path(downloaded_folder)
@@ -58,10 +58,11 @@ def download_directory_from_s3(bucket_name, remote_folder_name, local_folder):
         bucket.download_file(obj.key, obj_location)
 
 
-def get_tokenizer_file_from_s3(key, revision="main", bucket_name=MSTAR_RESOLVE_ENDPOINT):
-    download_folder = f'{default_tok_cache_path}/'
+def get_tokenizer_file_from_s3(key, revision="main", bucket_name=MSTAR_RESOLVE_ENDPOINT, cache_dir = None):
+    cache_dir = cache_dir or mstar_cache_home
+    download_folder = os.path.join(cache_dir,  "tokenizers") 
     bucket_name = _default_endpoint
-    tokenizer_folder = f"{download_folder}/{key}/{revision}/"
+    tokenizer_folder = os.path.join(download_folder, key, revision)
     download_directory_from_s3(bucket_name, f"tokenizers/{key}/{revision}/", download_folder)
     return tokenizer_folder
     

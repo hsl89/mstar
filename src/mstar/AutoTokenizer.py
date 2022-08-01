@@ -18,6 +18,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
     """
     # Shared args among mstar and hf models.
     revision = kwargs.get("revision", 'main')
+    cache_dir = kwargs.get("cache_dir", None)
     if os.path.isdir(pretrained_model_name_or_path):
         # Load config file.
         config_path = f"{pretrained_model_name_or_path}/tokenizer_config.json"
@@ -46,7 +47,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
         model_type = "-".join(pretrained_model_name_or_path.split("-")[:2])
         if model_type in tokenizer_class_dict:
             print(f"Loading mstar tokenizer {pretrained_model_name_or_path}\n")
-            downloaded_folder = get_tokenizer_file_from_s3(pretrained_model_name_or_path, revision=revision)
+            downloaded_folder = get_tokenizer_file_from_s3(pretrained_model_name_or_path, revision=revision, cache_dir=cache_dir)
             config_path = f"{downloaded_folder}/tokenizer_config.json"
             with open(config_path, encoding='utf-8') as infile:
                 tok_config = json.load(infile)
@@ -62,7 +63,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
             if model_type.startswith("mstar") or model_type.startswith("atm"):
                 model_type = "-".join(pretrained_model_name_or_path.split("-")[:2])
                 print(f"Loading mstar tokenizer {pretrained_model_name_or_path}\n")
-                downloaded_folder = get_tokenizer_file_from_s3(pretrained_model_name_or_path, revision=revision)
+                downloaded_folder = get_tokenizer_file_from_s3(pretrained_model_name_or_path, revision=revision, cache_dir=cache_dir)
                 config_path = f"{downloaded_folder}/tokenizer_config.json"
                 with open(config_path, encoding='utf-8') as infile:
                     tok_config = json.load(infile)
