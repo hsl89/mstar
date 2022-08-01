@@ -1,0 +1,4 @@
+numpy==1.23.1
+pyarrow==8.0
+smart-open[s3]==6.0.0
+zstandard==0.18.0

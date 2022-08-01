@@ -11,8 +11,10 @@ from setuptools import find_packages, setup
 
 
 def read(*names, **kwargs):
-    with io.open(os.path.join(os.path.dirname(__file__), *names),
-                 encoding=kwargs.get("encoding", "utf8")) as fp:
+    with io.open(
+        os.path.join(os.path.dirname(__file__), *names),
+        encoding=kwargs.get("encoding", "utf8"),
+    ) as fp:
         return fp.read()
 
 
@@ -24,50 +26,50 @@ def find_version(*file_paths):
     raise RuntimeError("Unable to find version string.")
 
 
-VERSION = find_version('src', 'mstar', '__init__.py')
+VERSION = find_version("src", "mstar", "__init__.py")
 
-if VERSION.endswith('dev'):
-    VERSION = VERSION + datetime.today().strftime('%Y%m%d')
+if VERSION.endswith("dev"):
+    VERSION = VERSION + datetime.today().strftime("%Y%m%d")
 
 requirements = [
-    'boto3',
-    's3fs',
-    'smart_open',
-    'h5py>=2.10.0',
-    'yacs>=0.1.8',
-    'sentencepiece',
-    'tqdm',
-    'regex',
-    'requests',
-    'pyarrow>=3',
-    'transformers>=4.18.0',
-    'tokenizers>=0.10.2',  # 0.10.1 is buggy
-    'tensorboard',
-    'pandas',
+    "boto3",
+    "s3fs",
+    "smart_open",
+    "h5py>=2.10.0",
+    "yacs>=0.1.8",
+    "sentencepiece",
+    "tqdm",
+    "regex",
+    "requests",
+    "pyarrow>=3",
+    "transformers>=4.18.0",
+    "tokenizers>=0.10.2",  # 0.10.1 is buggy
+    "tensorboard",
+    "pandas",
     'contextvars;python_version<"3.7"',  # Contextvars for python <= 3.6
     'dataclasses;python_version<"3.7"',  # Dataclass for python <= 3.6
     'pickle5;python_version<"3.8"',  # pickle protocol 5 for python <= 3.8
-    'graphviz',
+    "graphviz",
     # We can also use patched pytorch-lightning branch to add bfloat16 training support
-    'pytorch_lightning==1.6.3',
-    'jsonargparse[signatures]@git+https://github.com/leezu/jsonargparse@cf8a40fe2a2d91542d1b2798f065be327f29fcad',  # v3.19 + workaround for https://github.com/PyTorchLightning/pytorch-lightning/issues/9207
-    'torchmetrics@git+https://github.com/leezu/metrics@d9ad0ac1ee875cc410fd21b49804b65d592459e3',  # v0.5 + workaround for https://github.com/PyTorchLightning/metrics/issues/484
-    'fairscale',
-    'asttokens',
-    'psutil',
-    'ujson',
-    'seqeval',
-    'datasets',
-    'mlflow==1.22.0',
-    'protobuf<=3.20.1',
+    "pytorch_lightning==1.6.3",
+    "jsonargparse[signatures]@git+https://github.com/leezu/jsonargparse@cf8a40fe2a2d91542d1b2798f065be327f29fcad",  # v3.19 + workaround for https://github.com/PyTorchLightning/pytorch-lightning/issues/9207
+    "torchmetrics@git+https://github.com/leezu/metrics@d9ad0ac1ee875cc410fd21b49804b65d592459e3",  # v0.5 + workaround for https://github.com/PyTorchLightning/metrics/issues/484
+    "fairscale",
+    "asttokens",
+    "psutil",
+    "ujson",
+    "seqeval",
+    "datasets",
+    "mlflow==1.22.0",
+    "protobuf<=3.20.1",
 ]
 
 tests_require = [
-    'prospector',
-    'pytest',
-    'pytest-mock',
-    'moto',
-    'lorem',
+    "prospector",
+    "pytest",
+    "pytest-mock",
+    "moto",
+    "lorem",
 ]
 
 rlfh_require = [
@@ -77,16 +79,19 @@ rlfh_require = [
     "dataclasses",
     "typing",
     "absl-py",
-    'hydra-core',
+    "hydra-core",
     "rouge-score",
     "sacrebleu<2.0",
     "nltk==3.6.5",
-    "protobuf==3.20.1"
+    "protobuf==3.20.1",
 ]
 
+pile_require = ["numpy", "pyarrow==8.0.0", "smart-open[s3]", "zstandard==0.18"]
+
 extras = {
-    'test': tests_require,
-    'rlfh': rlfh_require
+    "test": tests_require,
+    "rlfh": rlfh_require,
+    "pile": pile_require,
 }
 force_cuda = os.getenv("FORCE_CUDA", "0") == "1"
 extensions = []
@@ -96,7 +101,9 @@ if (torch.cuda.is_available() and CUDA_HOME is not None) or force_cuda:
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "src/mstar/clib")
     ]
     megatron_include_dirs = [
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "src/mstar/clib/megatron")
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "src/mstar/clib/megatron"
+        )
     ]
 
     fused_softmax_nvcc = [
@@ -156,7 +163,10 @@ if (torch.cuda.is_available() and CUDA_HOME is not None) or force_cuda:
                     "src/mstar/clib/megatron/layer_norm_cuda.cpp",
                     "src/mstar/clib/megatron/layer_norm_cuda_kernel.cu",
                 ],
-                extra_compile_args={"cxx": ["-O3"], "nvcc": ["-O3", "--use_fast_math", "-maxrregcount=50"]},
+                extra_compile_args={
+                    "cxx": ["-O3"],
+                    "nvcc": ["-O3", "--use_fast_math", "-maxrregcount=50"],
+                },
             ),
         ]
     )
@@ -166,24 +176,27 @@ else:
     warnings.warn("Cannot install optimized CUDA kernels.")
 setup(
     # Metadata
-    name='mstar',
+    name="mstar",
     version=VERSION,
-    python_requires='>=3.6',
-    description='M*',
-    long_description_content_type='text/markdown',
-
+    python_requires=">=3.6",
+    description="M*",
+    long_description_content_type="text/markdown",
     # Package info
-    packages=find_packages(where="src", exclude=(
-        'tests',
-        'scripts',
-    )),
+    packages=find_packages(
+        where="src",
+        exclude=(
+            "tests",
+            "scripts",
+        ),
+    ),
     package_dir={"": "src"},
-    package_data={'': [os.path.join('datasets', 'dataset_checksums', '*.txt')]},
+    package_data={"": [os.path.join("datasets", "dataset_checksums", "*.txt")]},
     zip_safe=True,
     include_package_data=True,
     install_requires=requirements,
     tests_require=tests_require,
     rlfh_require=rlfh_require,
+    pile_require=pile_require,
     extras_require=extras,
     ext_modules=extensions,
     cmdclass=cmdclass,
