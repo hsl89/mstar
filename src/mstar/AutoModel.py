@@ -52,12 +52,17 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
         pretrained_model_name_or_path (`str` or `os.PathLike`):
                 Can be either:
 
-                - A string, the *model id* of a predefined tokenizer hosted inside a model repo on huggingface.co.
-                  Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
-                  user or organization name, like `dbmdz/bert-base-german-cased`.
-                - A path to a *directory* containing vocabulary files required by the tokenizer, for instance saved
-                  using the [`~tokenization_utils_base.PreTrainedTokenizerBase.save_pretrained`]
-                  method, e.g., `./my_model_directory/`.
+                - A string, the *model id* of a predefined model configuration hosted inside a model repo on
+                  huggingface.co or S3://mstar-models. Valid model ids can be located at the root-level, like
+                  `bert-base-uncased`, or namespaced under a user or organization name, like
+                  `dbmdz/bert-base-german-cased`, or mstar model id format [source]-[model_type]-[model_size], like
+                  `mstar-gpt2-672M`.
+                - A path to a directory containing model weights saved using
+                  [`~PreTrainedModel.save_pretrained`], e.g., `./my_model_directory/`.
+                - A path or url to a *PyTorch state_dict save file* (e.g, `./pt_model/pytorch_model.bin`). In this
+                  case, `from_pt` should be set to `True` and a configuration object should be provided as `config`
+                  argument. This loading path is slower than converting the PyTorch model in a TensorFlow model
+                  using the provided conversion scripts and loading the TensorFlow model afterwards.
         force_download (bool): whether redownload the mstar model files from s3.
 
     Returns:

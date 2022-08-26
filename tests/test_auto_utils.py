@@ -1,7 +1,8 @@
 import os
 from mstar.AutoTokenizer import from_pretrained as tok_from_pretrained
 from mstar.AutoModel import from_pretrained as model_from_pretrained
-from mstar.utils.hf_utils import get_model_file_from_s3, get_md5sum
+from mstar.AutoConfig import from_pretrained as config_from_pretrained
+from mstar.utils.hf_utils import get_model_file_from_s3, get_config_file_from_s3, get_md5sum
 
 mstar_cache_home = os.path.expanduser(
     os.getenv(
@@ -93,6 +94,7 @@ def test_get_model_file_from_s3():
     )
     _assert(downloaded_folder, mstar_cache_home)
 
+
 def test_auto_tokenizer_save_load():
     """Functional test of loading tokenizer from s3 bucket, saving to local and loading from local"""
     local_path = "./saved_tokenizer"
@@ -100,3 +102,38 @@ def test_auto_tokenizer_save_load():
     tokenizer.save_pretrained(local_path)
     tokenizer2 = tok_from_pretrained(local_path)
     assert tokenizer("hello world") == tokenizer2("hello world")
+
+
+def test_get_config_file_from_s3():
+    # Test load config from s3://mstar-models
+    config = config_from_pretrained("mstar-gpt2-600M")
+    assert config.model_type == "mstar-gpt2"
+    assert config.scale_attn_weights == True
+    assert config.n_positions == 1024
+    assert config.n_ctx == 1024
+
+    # Test load config from local
+    key = "atm-Seq2Seq-406M"
+    revision = "main"
+    config_folder = get_config_file_from_s3(key, revision=revision, force_download=True)
+    config = config_from_pretrained(config_folder)
+    assert config.model_type == "atm-Seq2Seq"
+    assert config.static_position_embeddings == False
+    assert config.max_position_embeddings == 512
+
+    # Test load config from huggingface
+    config, unused_kwargs = config_from_pretrained("bert-base-uncased", output_attentions=True, foo=False, return_unused_kwargs=True)
+    assert config.output_attentions == True
+    assert unused_kwargs == {'foo': False}
+
+    # Test load huggingface config from local
+    config = config_from_pretrained("./tests/test_config.json")
+    assert config.type_vocab_size == 2
+    config.gradient_checkpointing = True
+    assert config.gradient_checkpointing
+
+    # Test load config from a model type doesn't exist in model_factory
+    # but we have model parameters in S3 bucket
+    config = config_from_pretrained("atm-DistilledBERT-170M")
+    assert config.hidden_act == "gelu"
+    assert config.architectures == ["BertModel"]
