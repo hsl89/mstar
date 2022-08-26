@@ -70,6 +70,10 @@ class PreLnSeq2SeqDecoderLayer(nn.Module):
         self.final_layer_norm = PreLnLayerNorm(config.d_model, eps=config.layer_norm_eps,
                                                fp32_cast_layer_norm=config.fp32_cast_layer_norm)
 
+    @property
+    def device(self):
+        return next(self.parameters()).device
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -222,7 +226,14 @@ class PreLnSeq2SeqDecoder(PreLNSeq2SeqPretrainedModel):
         self.layernorm_output = PreLnLayerNorm(config.d_model, eps=config.layer_norm_eps,
                                                fp32_cast_layer_norm=config.fp32_cast_layer_norm)
 
+        self.model_parallel_devices = 0
+        self.num_layers = config.decoder_layers
+
         self.init_weights()
+
+    @property
+    def starting_device(self):
+        return self.embed_tokens.weight.device
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -248,6 +259,26 @@ class PreLnSeq2SeqDecoder(PreLNSeq2SeqPretrainedModel):
 
         return combined_attention_mask
 
+    def set_model_parallel_devices(self, num_devices):
+        self.model_parallel_devices = num_devices
+ 
+    def parallelize(self, num_devices, start_device, use_cpu):
+        assert num_devices > 1, "number of devices should be larger than 1"
+        if use_cpu:
+            device_list = ['cpu'] + ['cuda:{}'.format(i) for i in range(start_device, num_devices + start_device - 1)]
+        else:
+            device_list = ['cuda:{}'.format(i) for i in range(start_device, num_devices + start_device)]
+ 
+        self.set_model_parallel_devices(num_devices)
+ 
+        self.embed_tokens.to(device_list[-1])
+        self.embed_positions.to(device_list[-1])
+        self.layernorm_output.to(device_list[-1])
+        k = self.num_layers/num_devices
+        for i, layer in enumerate(self.layers):
+            layer.to(device_list[int(i/k)])
+
+    # pylint: disable=too-many-statements
     def forward(
         self,
         input_ids=None,
@@ -384,12 +415,17 @@ class PreLnSeq2SeqDecoder(PreLNSeq2SeqPretrainedModel):
             ), f"The head_mask should be specified for {len(self.layers)} layers, but it is for {head_mask.size()[0]}."
         for idx, decoder_layer in enumerate(self.layers):
             # add LayerDrop (see https://arxiv.org/abs/1909.11556 for description)
-            #### debug
-            if hidden_states.isinf().any().item():
-                print("HS to decoder layer {} is inf".format(idx))
-            elif hidden_states.isnan().any().item():
-                print("HS to decoder layer {} is nan".format(idx))
-            ########
+            if self.model_parallel_devices:
+                if hidden_states.device != decoder_layer.device:
+                    hidden_states = hidden_states.to(decoder_layer.device)
+                    encoder_hidden_states = encoder_hidden_states.to(decoder_layer.device)
+                    if attention_mask is not None:
+                        attention_mask = attention_mask.to(decoder_layer.device)
+                    if encoder_attention_mask is not None:
+                        encoder_attention_mask = encoder_attention_mask.to(decoder_layer.device)
+                    if output_hidden_states:
+                        all_hidden_states = hidden_states.to(decoder_layer.device)
+
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
             dropout_probability = random.uniform(0, 1)
@@ -500,7 +536,28 @@ class PreLnEncoderForSeq2Seq(PreLNSeq2SeqPretrainedModel):
         else:
             self.pre_ln_encoder = MemEfficientPreLnEncoder(self.config)
         self.use_attn_fuse_enc = config.use_attn_fuse_enc
+
+        self.model_parallel_devices = 0
+        self.num_layers = config.encoder_layers
         self.init_weights()
+
+    def set_model_parallel_devices(self, num_devices):
+        self.model_parallel_devices = num_devices
+        if not self.mem_efficient_encoder:
+            raise Exception('model parallel only supports mem_efficient_encoder')
+ 
+    def parallelize(self, num_devices, start_device, use_cpu):
+        if use_cpu:
+            device_list = ['cpu'] + ['cuda:{}'.format(i) for i in range(start_device, num_devices + start_device - 1)]
+        else:
+            device_list = ['cuda:{}'.format(i) for i in range(start_device, num_devices + start_device)]
+ 
+        self.set_model_parallel_devices(num_devices)
+ 
+        self.position_embeddings.to(device_list[0])
+        self.token_type_embeddings.to(device_list[0])
+        self.position_ids = self.position_ids.to(device_list[0])
+        self.pre_ln_encoder.parallelize(num_devices, start_device, use_cpu)
 
     def forward(
         self,
@@ -622,6 +679,8 @@ class PreLNSeq2SeqModel(PreLNSeq2SeqPretrainedModel):
         if self.use_attn_fuse_enc:
             self.task_vector = nn.Linear(config.hidden_size, 1, bias=False)
 
+        self.model_parallel_devices = 0
+
         self.init_weights()
 
     def get_input_embeddings(self):
@@ -632,11 +691,33 @@ class PreLNSeq2SeqModel(PreLNSeq2SeqPretrainedModel):
         self.encoder.embed_tokens = self.shared
         self.decoder.embed_tokens = self.shared
 
+    def set_model_parallel_devices(self, num_devices):
+        self.model_parallel_devices = num_devices
+
     def get_encoder(self):
         return self.encoder
 
     def get_decoder(self):
         return self.decoder
+
+    def parallelize(self, num_devices, start_device, use_cpu):
+        assert num_devices % 2 == 0, "parallelize only support parallelizing into even number of GPUs"
+        assert num_devices + start_device <= torch.cuda.device_count(), "number of available GPUs are less than " \
+                                                                        "num_devices plus start_device for " \
+                                                                        "model parallel"
+        if use_cpu:
+            device_list = ['cpu'] + ['cuda:{}'.format(i) for i in range(start_device, num_devices + start_device - 1)]
+        else:
+            device_list = ['cuda:{}'.format(i) for i in range(start_device, num_devices + start_device)]
+        self.set_model_parallel_devices(num_devices)
+        if num_devices == 2:
+            self.shared.to(device_list[0])
+            self.encoder.to(device_list[0])
+            self.decoder.to(device_list[1])
+        elif num_devices > 2:
+            self.shared.to(device_list[0])
+            self.encoder.parallelize(num_devices//2, start_device, use_cpu)
+            self.decoder.parallelize(num_devices//2, start_device + num_devices//2, use_cpu)
 
     def forward(
         self,
@@ -702,6 +783,11 @@ class PreLNSeq2SeqModel(PreLNSeq2SeqPretrainedModel):
         else:
             encoder_output_to_decoder = encoder_outputs.last_hidden_state
 
+        if self.model_parallel_devices > 0:
+            encoder_output_to_decoder = encoder_output_to_decoder.to(self.decoder.device)
+            decoder_input_ids = decoder_input_ids.to(self.decoder.device)
+            if attention_mask is not None:
+                attention_mask = attention_mask.to(self.decoder.device)
         decoder_outputs = self.decoder(
             input_ids=decoder_input_ids,
             attention_mask=decoder_attention_mask,
@@ -747,7 +833,7 @@ class PreLNSeq2SeqForConditionalGeneration(PreLNSeq2SeqPretrainedModel):
         self.register_buffer("final_logits_bias", torch.zeros((1, self.model.shared.num_embeddings)))
         self.lm_head = nn.Linear(config.hidden_size, self.model.shared.num_embeddings, bias=False)
 
-
+        self.model_parallel_devices = 0
         self.init_weights()
 
     def get_encoder(self):
@@ -776,6 +862,44 @@ class PreLNSeq2SeqForConditionalGeneration(PreLNSeq2SeqPretrainedModel):
 
     def set_output_embeddings(self, new_embeddings):
         self.lm_head = new_embeddings
+
+    def set_model_parallel_devices(self, num_devices):
+        self.model_parallel_devices = num_devices
+ 
+    def parallelize(self, num_devices=2, start_device=0, use_cpu=False):
+        """
+        This function put the model on CPU and multiple GPUs allowing to run inference with larger model sizes on devices
+        with variable memory. It supports partitioining the model into up to 8 devices.
+        Since it is for a seq2seq model, it requires the number of devices to be even so encoder and decoder get
+        partitioned into equal number of devices.
+        :param num_devices: number of devices to partition the model into
+        :param start_device: the starting device id of GPU
+        :param use_cpu: partition the model on CPU
+        :return:
+        """
+        logger.warn("Model parallelize is tested only for AlexaTM 20B Model.")
+        assert num_devices % 2 == 0, "parallelize only support parallelizing into even number of GPUs"
+        assert num_devices + start_device <= torch.cuda.device_count(), "number of available GPUs are less than " \
+                                                                        "num_devices plus start_device for " \
+                                                                        "model parallel"
+        if use_cpu:
+            device_list = ['cpu'] + ['cuda:{}'.format(i) for i in range(start_device, num_devices + start_device - 1)]
+        else:
+            device_list = ['cuda:{}'.format(i) for i in range(start_device, num_devices + start_device)]
+ 
+        self.set_model_parallel_devices(num_devices)
+ 
+        self.lm_head.to(device_list[-1])
+        self.final_logits_bias = self.final_logits_bias.to(device_list[-1])
+ 
+        self.model.parallelize(num_devices, start_device, use_cpu)
+ 
+    def deparallelize(self):
+        self.set_model_parallel_devices(0)
+        self.model.to('cpu')
+        self.lm_head.to('cpu')
+        self.final_logits_bias = self.final_logits_bias.to('cpu')
+        torch.cuda.empty_cache()
 
     def forward(
         self,
@@ -877,19 +1001,40 @@ class PreLNSeq2SeqForConditionalGeneration(PreLNSeq2SeqPretrainedModel):
     def prepare_decoder_input_ids_from_labels(self, labels: torch.Tensor):
         return shift_tokens_right(labels, self.config.pad_token_id, self.config.decoder_start_token_id)
 
-    @staticmethod
-    def _reorder_cache(past, beam_idx):
+#    @staticmethod
+    def _reorder_cache(self, past, beam_idx):
         reordered_past = ()
         for layer_past in past:
+            if self.model_parallel_devices > 2 and beam_idx.device != layer_past[0].device:
+                beam_idx = beam_idx.to(layer_past[0].device)
             # cached cross_attention states don't have to be reordered -> they are always the same
             reordered_past += (
                 tuple(past_state.index_select(0, beam_idx) for past_state in layer_past[:2]) + layer_past[2:],
             )
         return reordered_past
 
+    # have to rewrite this to work with model_parallel
+    def _prepare_decoder_input_ids_for_generation(
+        self, batch_size: int, decoder_start_token_id: int = None, bos_token_id: int = None,
+        model_kwargs: Optional[Dict[str, torch.Tensor]] = None, device: torch.device = None,
+    ) -> torch.LongTensor:
+        if model_kwargs is not None and "decoder_input_ids" in model_kwargs:
+            return model_kwargs.pop("decoder_input_ids")
+        else:
+            decoder_start_token_id = self._get_decoder_start_token_id(decoder_start_token_id, bos_token_id)
+            ## Force the device to use decoder.starting_device
+            device = self.model.decoder.starting_device
+            decoder_input_ids = (
+                torch.ones((batch_size, 1), dtype=torch.long,
+                        device=device)
+                * decoder_start_token_id
+            )
+            return decoder_input_ids
+
 # need to overwrite this for attention fusion
-    @staticmethod
+    # @staticmethod
     def _expand_inputs_for_generation(
+        self,
         input_ids: torch.LongTensor,
         expand_size: int = 1,
         is_encoder_decoder: bool = False,
@@ -901,6 +1046,8 @@ class PreLNSeq2SeqForConditionalGeneration(PreLNSeq2SeqPretrainedModel):
             torch.arange(input_ids.shape[0]).view(-1, 1).repeat(1, expand_size).view(-1).to(input_ids.device)
         )
         input_ids = input_ids.index_select(0, expanded_return_idx)
+        if self.model_parallel_devices:
+            attention_mask = attention_mask.to(self.model.decoder.starting_device)
 
         if "token_type_ids" in model_kwargs:
             token_type_ids = model_kwargs["token_type_ids"]
@@ -911,11 +1058,17 @@ class PreLNSeq2SeqForConditionalGeneration(PreLNSeq2SeqPretrainedModel):
 
         if is_encoder_decoder:
             assert encoder_outputs is not None
+            if self.model_parallel_devices:
+                encoder_outputs["last_hidden_state"] = encoder_outputs["last_hidden_state"].to(
+                    self.model.decoder.starting_device)
             encoder_outputs["last_hidden_state"] = encoder_outputs.last_hidden_state.index_select(
                 0, expanded_return_idx
             )
             # this is the additional change needed for attention fusion
             if encoder_outputs.hidden_states is not None:
+                if self.model_parallel_devices:
+                    encoder_outputs["hidden_states"] = encoder_outputs["hidden_states"].to(
+                        self.model.decoder.starting_device)
                 encoder_outputs["hidden_states"] = tuple(h.index_select(
                     0, expanded_return_idx
                 ) for h in encoder_outputs.hidden_states)

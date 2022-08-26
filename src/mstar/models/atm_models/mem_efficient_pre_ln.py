@@ -51,6 +51,10 @@ class MemEfficentPreLnLayer(nn.Module):
         self.layer_norm = PreLnLayerNorm(
             config.hidden_size, eps=config.layer_norm_eps, fp32_cast_layer_norm=config.fp32_cast_layer_norm)
 
+    @property
+    def device(self):
+        return next(self.parameters()).device
+
     def forward(
         self,
         before_layer_norm,
@@ -113,6 +117,26 @@ class MemEfficientPreLnEncoder(nn.Module):
             eps=config.layer_norm_eps,
             fp32_cast_layer_norm=config.fp32_cast_layer_norm
         )
+        self.model_parallel_devices = 0
+        self.num_layers = config.encoder_layers
+ 
+    def set_model_parallel_devices(self, num_devices):
+        self.model_parallel_devices = num_devices
+ 
+    def parallelize(self, num_devices, start_device, use_cpu):
+        assert num_devices > 1, "number of devices should be larger than 1"
+        if use_cpu:
+            device_list = ['cpu'] + ['cuda:{}'.format(i) for i in range(start_device, num_devices + start_device - 1)]
+        else:
+            device_list = ['cuda:{}'.format(i) for i in range(start_device, num_devices + start_device)]
+ 
+        self.set_model_parallel_devices(num_devices)
+ 
+        self.layer_norm.to(device_list[-1])
+ 
+        k = self.num_layers/num_devices
+        for i, layer in enumerate(self.layer):
+            layer.to(device_list[int(i/k)])
 
     def forward(
         self,
@@ -133,6 +157,16 @@ class MemEfficientPreLnEncoder(nn.Module):
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
             layer_head_mask = head_mask[i] if head_mask is not None else None
+
+            if self.model_parallel_devices:
+                if hidden_states.device != layer_module.device:
+                    hidden_states = hidden_states.to(layer_module.device)
+                    if attention_mask is not None:
+                        attention_mask = attention_mask.to(layer_module.device)
+                    if layer_head_mask is not None:
+                        layer_head_mask = layer_head_mask.to(layer_module.device)
+                    if output_hidden_states:
+                        all_hidden_states = all_hidden_states.to(layer_module.device)
 
             if getattr(self.config, "gradient_checkpointing", False):
 

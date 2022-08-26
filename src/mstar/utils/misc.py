@@ -186,7 +186,7 @@ def download(url: str,  # noqa: MC0001
                     else:
                         s3.meta.client.download_file(s3_bucket_name, s3_key, tmp_path)
                 else:
-                    r = requests.get(url, stream=True, verify=verify_ssl)
+                    r = requests.get(url, stream=True, verify=verify_ssl)  # pylint: disable=missing-timeout
                     if r.status_code != 200:
                         raise RuntimeError('Failed downloading url {}'.format(url))
                     # create uuid for temporary files
