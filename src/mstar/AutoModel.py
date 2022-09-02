@@ -12,23 +12,28 @@ from mstar.utils.hf_utils import get_model_file_from_s3
 from mstar.models.model_factory import config_dict, model_class_dict
 
 
-import torch 
+import torch
+
+
 def print_model_para(model):
     value_dict = {}
     for name, param in model.state_dict().items():
-        value = torch.sum(param)        
-        value_dict[name] = value   
+        value = torch.sum(param)
+        value_dict[name] = value
     return value_dict
 
 
 def create_mappings():
     mapping_dict = defaultdict(dict)
-    for model_mapping, auto_func in [(MODEL_MAPPING_NAMES, 'AutoModel'),\
-                                     (MODEL_FOR_PRETRAINING_MAPPING_NAMES, 'AutoModelForPreTraining'),\
-                                     (MODEL_WITH_LM_HEAD_MAPPING_NAMES, 'AutoModelForMaskedLM')]:
+    for model_mapping, auto_func in [
+        (MODEL_MAPPING_NAMES, "AutoModel"),
+        (MODEL_FOR_PRETRAINING_MAPPING_NAMES, "AutoModelForPreTraining"),
+        (MODEL_WITH_LM_HEAD_MAPPING_NAMES, "AutoModelForMaskedLM"),
+    ]:
         for model_type, model_class in model_mapping.items():
             mapping_dict[model_type][model_class] = auto_func
     return mapping_dict
+
 
 def get_auto_function(model_config):
     """Get Huggingface Auto-function from model config
@@ -42,6 +47,7 @@ def get_auto_function(model_config):
     model_mapping_dict = create_mappings()
     # TODO(zhenghuj): considering multiple architectures for one config
     return getattr(transformers, model_mapping_dict[model_type][architectures[0]])
+
 
 def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
     """Load model from s3 bucket or local file.
@@ -71,13 +77,13 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
     # args used for loading mstar models
     # Shared args among mstar and hf models.
     force_download = kwargs.get("force_download", None)
-    revision = kwargs.get("revision", 'main')
+    revision = kwargs.get("revision", "main")
     cache_dir = kwargs.get("cache_dir", None)
     model = None
     if os.path.isdir(pretrained_model_name_or_path):
         # Load config file.
         config_path = f"{pretrained_model_name_or_path}/config.json"
-        with open(config_path, encoding='utf-8') as infile:
+        with open(config_path, encoding="utf-8") as infile:
             model_config = json.load(infile)
         model_type = model_config.get("model_type", None)
         if model_type in config_dict:
@@ -87,28 +93,38 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
             model = AutoModel.from_pretrained(pretrained_model_name_or_path)
         else:
             print(f"Loading huggingface model from {pretrained_model_name_or_path}")
-            return AutoModel.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
+            return AutoModel.from_pretrained(
+                pretrained_model_name_or_path, *inputs, **kwargs
+            )
     else:
         model_type = "-".join(pretrained_model_name_or_path.split("-")[:2])
         key = pretrained_model_name_or_path
         if model_type not in config_dict:
             if model_type.startswith("mstar") or model_type.startswith("atm"):
-                downloaded_folder = get_model_file_from_s3(key, revision, force_download=force_download, cache_dir=cache_dir)
+                downloaded_folder = get_model_file_from_s3(
+                    key, revision, force_download=force_download, cache_dir=cache_dir
+                )
                 print(f"Loading mstar model {key}")
                 config_path = f"{downloaded_folder}/config.json"
-                with open(config_path, encoding='utf-8') as infile:
+                with open(config_path, encoding="utf-8") as infile:
                     model_config = json.load(infile)
-                return get_auto_function(model_config).from_pretrained(downloaded_folder)
+                return get_auto_function(model_config).from_pretrained(
+                    downloaded_folder
+                )
             else:
                 # Load HF models
                 print(f"Loading huggingface model from {pretrained_model_name_or_path}")
-                return AutoModel.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
+                return AutoModel.from_pretrained(
+                    pretrained_model_name_or_path, *inputs, **kwargs
+                )
         # Register custom model class
         AutoConfig.register(model_type, config_dict[model_type])
-        AutoModel.register(config_dict[model_type], model_class_dict[model_type])    
+        AutoModel.register(config_dict[model_type], model_class_dict[model_type])
 
-        # Downlaod from s3. 
-        downloaded_folder = get_model_file_from_s3(key, revision, force_download=force_download, cache_dir=cache_dir)
+        # Downlaod from s3.
+        downloaded_folder = get_model_file_from_s3(
+            key, revision, force_download=force_download, cache_dir=cache_dir
+        )
         print(f"Loading mstar model {key}")
-        model = AutoModel.from_pretrained(downloaded_folder)  
+        model = AutoModel.from_pretrained(downloaded_folder)
     return model
