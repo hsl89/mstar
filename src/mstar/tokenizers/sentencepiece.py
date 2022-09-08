@@ -28,9 +28,33 @@ class SentencepieceTokenizer(T5Tokenizer):
         )
 
         # Set subword_sampling parameters here since we need to preserve the signature of `_tokenize`
-        self.sample_subwords = sample_subwords
-        self.sampling_size = sampling_size
-        self.alpha = alpha
+        self._sample_subwords = sample_subwords
+        self._sampling_size = sampling_size
+        self._alpha = alpha
+
+    def enable_subword_sampling(self):
+        self._sample_subwords = True
+
+    def disable_subword_sampling(self):
+        self._sample_subwords = False
+
+    def set_sampling_size(self, sampling_size: float):
+        self._sampling_size = sampling_size
+
+    def set_alpha(self, alpha: float):
+        self._alpha = alpha
+
+    @property
+    def sample_subwords(self):
+        return self._sample_subwords
+
+    @property
+    def sampling_size(self):
+        return self._sampling_size
+
+    @property
+    def alpha(self):
+        return self._alpha
 
     def _tokenize(self, text: str) -> List[str]:
         """Take as input a string and return a list of strings (tokens) for words/sub-words. Subword sampling is used with the parameters specified during initiatlization if enabled."""

@@ -20,6 +20,7 @@ from mstar.models.atm_models import (
     MT5ForMaskedLM,
 )
 from mstar.tokenizers.gptbart import GPT2BartTokenizer
+from mstar.tokenizers.sentencepiece import SentencepieceTokenizer
 from mstar.tokenizers.atm_tokenizers import ATMTokenizerFast, MT5TokenizerFastWithMask
 from transformers import GPT2Tokenizer, T5Tokenizer
 
@@ -48,15 +49,15 @@ model_class_dict = {
 }
 
 tokenizer_class_dict = {
-    "mstar-gpt2": [GPT2BartTokenizer],
-    "mstar-gpt2LMHead": [GPT2BartTokenizer],
+    "mstar-gpt2": [GPT2BartTokenizer, SentencepieceTokenizer],
+    "mstar-gpt2LMHead": [GPT2BartTokenizer, SentencepieceTokenizer],
     "atm-PreLnForMaskedLM": [ATMTokenizerFast],
     "atm-PreLn": [ATMTokenizerFast],
     "atm-PreLNSeq2Seq": [ATMTokenizerFast],
     "atm-Seq2Seq": [ATMTokenizerFast],
     "atm-MT5": [MT5TokenizerFastWithMask],
     "atm-MT5ForMaskedLM": [MT5TokenizerFastWithMask],
-    "mstar-t5": [T5Tokenizer],
+    "mstar-t5": [T5Tokenizer, SentencepieceTokenizer],
 }
 
 
@@ -66,4 +67,5 @@ tokenizer_mapping = {
     "MT5TokenizerFastWithMask": MT5TokenizerFastWithMask,
     "GPT2Tokenizer": GPT2Tokenizer,
     "T5Tokenizer": T5Tokenizer,
+    "SentencepieceTokenizer": SentencepieceTokenizer,
 }
