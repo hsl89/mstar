@@ -1,5 +1,5 @@
 ## Base docker image built on Dockerfile.mstar.base
-FROM 747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-gitlab:base as base
+FROM 747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-gitlab:base1.2 as base
 LABEL maintainer="MStar Team"
 
 # Copy the source code and install 

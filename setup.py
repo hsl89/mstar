@@ -42,8 +42,9 @@ requirements = [
     "regex",
     "requests",
     "pyarrow>=3",
-    "transformers>=4.18.0,<=4.21.2",  # Set upper bound to avoid breaking changes in transformers.  
+    "transformers@git+https://github.com/barry-jin/transformers@8bf3a601a764c4d74e6488be8bc7a9efacaf1ddc",  # transformers that support balanced strategies.  
     "tokenizers>=0.10.2,<=0.12.1",  # 0.10.1 is buggy; Set upper bound to avoid breaking changes in tokenizers. 
+    "accelerate>=0.9.0,<=0.12.0",
     "tensorboard",
     "pandas",
     'contextvars;python_version<"3.7"',  # Contextvars for python <= 3.6

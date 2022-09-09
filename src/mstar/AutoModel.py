@@ -70,6 +70,14 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
                   argument. This loading path is slower than converting the PyTorch model in a TensorFlow model
                   using the provided conversion scripts and loading the TensorFlow model afterwards.
         force_download (bool): whether redownload the mstar model files from s3.
+        cache_dir (Union[str, os.PathLike], optional): 
+                Path to a directory in which a downloaded pretrained model configuration should be cached if
+                the standard cache should not be used.
+        device_map (str or Dict[str, Union[int, str, torch.device]], optional):
+                A map that specifies where each submodule should go. It doesn’t need to be refined to each
+                parameter/buffer name, once a given module name is inside, every submodule of it will be sent
+                to the same device. To have Accelerate compute the most optimized device_map automatically,
+                set device_map="auto".
 
     Returns:
         [type]: model
@@ -79,6 +87,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
     force_download = kwargs.get("force_download", None)
     revision = kwargs.get("revision", "main")
     cache_dir = kwargs.get("cache_dir", None)
+    device_map = kwargs.get("device_map", None)
     model = None
     if os.path.isdir(pretrained_model_name_or_path):
         # Load config file.
@@ -90,7 +99,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
             AutoConfig.register(model_type, config_dict[model_type])
             AutoModel.register(config_dict[model_type], model_class_dict[model_type])
             print(f"Loading mstar model from {pretrained_model_name_or_path}")
-            model = AutoModel.from_pretrained(pretrained_model_name_or_path)
+            model = AutoModel.from_pretrained(pretrained_model_name_or_path, device_map=device_map)
         else:
             print(f"Loading huggingface model from {pretrained_model_name_or_path}")
             return AutoModel.from_pretrained(
@@ -109,7 +118,8 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
                 with open(config_path, encoding="utf-8") as infile:
                     model_config = json.load(infile)
                 return get_auto_function(model_config).from_pretrained(
-                    downloaded_folder
+                    downloaded_folder,
+                    device_map=device_map
                 )
             else:
                 # Load HF models
@@ -126,5 +136,5 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
             key, revision, force_download=force_download, cache_dir=cache_dir
         )
         print(f"Loading mstar model {key}")
-        model = AutoModel.from_pretrained(downloaded_folder)
+        model = AutoModel.from_pretrained(downloaded_folder, device_map=device_map)  
     return model
