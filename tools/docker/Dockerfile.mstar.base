@@ -1,5 +1,5 @@
 #syntax=docker/dockerfile:1.2
-FROM nvidia/cuda:11.4.3-devel-ubuntu20.04 as base
+FROM nvidia/cuda:11.7.1-devel-ubuntu20.04 as base
 LABEL maintainer="MStar Team"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -67,14 +67,17 @@ RUN --mount=type=cache,target=/root/.cache/pip --mount=type=cache,target=/root/.
     cd /usr/local/src/ && \
     # Depends on LD_PRELOAD trick
     # pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio==0.10.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
-    git clone --recursive -j$(nproc) -b release/1.11-zero https://github.com/leezu/pytorch.git && \
+    git clone --recursive -j$(nproc) -b release/1.12-zero https://github.com/leezu/pytorch.git && \
     cd pytorch && \
     TORCH_CUDA_ARCH_LIST="8.0 7.5 7.0" USE_SYSTEM_NCCL=ON BUILD_CAFFE2_OPS=0 BUILD_CAFFE2=0 USE_MPI=0 \
         CUDA_NVCC_EXECUTABLE=/usr/local/bin/nvcc python3 setup.py install && \
     cd /usr/local/src/ && rm -rf pytorch
-    
+
+COPY DeepSpeed-ZeRO-2D.tar.gz /usr/local/src/DeepSpeed-ZeRO-2D.tar.gz
+
 RUN --mount=type=cache,target=/root/.cache/pip --mount=type=cache,target=/root/.ccache  \
-    TORCH_CUDA_ARCH_LIST="8.0 7.5 7.0" DS_BUILD_UTILS=1 DS_BUILD_FUSED_LAMB=1 python3 -m pip install deepspeed==0.6.1 --no-build-isolation
+    TORCH_CUDA_ARCH_LIST="8.0 7.5 7.0" DS_BUILD_UTILS=1 DS_BUILD_FUSED_LAMB=0 python3 -m pip install /usr/local/src/DeepSpeed-ZeRO-2D.tar.gz --no-build-isolation && \
+    rm /usr/local/src/DeepSpeed-ZeRO-2D.tar.gz
 
 RUN --mount=type=cache,target=/root/.cache/pip --mount=type=cache,target=/root/.ccache  \
     python3 -m pip install fairscale --no-build-isolation && \
