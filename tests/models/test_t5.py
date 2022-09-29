@@ -134,3 +134,53 @@ def test_loss():
     for x, y in zip(hf_model.parameters(), mstar_model.parameters()):
         # needs weaker standards than the default due to fused softmax difference
         assert torch.allclose(x.grad, y.grad, atol=GRADS_ATOL)
+
+
+def test_generate():
+    """Test that M* model generation for t5-small is equal to HF output
+    """
+    hf_model = transformers.T5ForConditionalGeneration.from_pretrained(
+        "t5-small"
+    ).cuda()
+
+    mstar_config = mstar.models.t5.MStarT5Config(
+        **hf_model.config.to_dict(),
+        softmax_type="mstar_fused",
+        softmax_precision="bf16",
+    )
+
+    mstar_model = mstar.models.t5.MStarT5ForConditionalGeneration(
+        config=mstar_config
+    ).cuda()
+
+    # can skip tied lm_head.weight
+    mstar_model.load_state_dict(hf_model.state_dict(), strict=False)
+
+    # model = mstar.models.t5.T5ForConditionalGeneration.from_pretrained(MODEL_NAME)
+    tokenizer = transformers.AutoTokenizer.from_pretrained("t5-small")
+
+    text_in = ["Hi my <extra_id_0> is Cole what's your favorite <extra_id_1>?"]
+
+    tokens_in = tokenizer(
+        text_in, truncation=True, padding=True, max_length=1024, return_tensors="pt"
+    )
+
+    for key in tokens_in.keys():
+        tokens_in[key] = tokens_in[key].to("cuda")
+
+    hf_model.eval()
+
+    hf_tokens_out = hf_model.generate(
+        input_ids=tokens_in["input_ids"], max_length=50, num_return_sequences=1
+    )
+
+    mstar_model.eval()
+
+    mstar_tokens_out = mstar_model.generate(
+        input_ids=tokens_in["input_ids"], max_length=50, num_return_sequences=1
+    )
+
+    hf_text_out = tokenizer.batch_decode(hf_tokens_out, skip_special_tokens=True)
+    mstar_text_out = tokenizer.batch_decode(mstar_tokens_out, skip_special_tokens=True)
+
+    assert mstar_text_out == hf_text_out == ["Hi Cole, my name?!"]

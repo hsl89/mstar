@@ -368,9 +368,7 @@ class FusedT5Attention(nn.Module):
                 self.alibi_positional_bias.device
             )
 
-        self.register_buffer(
-            "alibi_positional_bias", alibi_positional_bias.to(dtype)
-        )
+        self.register_buffer("alibi_positional_bias", alibi_positional_bias.to(dtype))
 
     def compute_alibi_bias(self, query_length, key_length):
         assert (
@@ -428,6 +426,8 @@ class FusedT5Attention(nn.Module):
 
         return positional_bias.to(device)
 
+    # preserve original huggingface code, ignore pylint warning
+    # pylint: disable=too-many-statements
     def forward(
         self,
         hidden_states,
@@ -563,15 +563,27 @@ class FusedT5Attention(nn.Module):
                     mask.shape[2] == 1 and len(mask.shape) == 4
                 ), "Fused softmax does not support per-head mask"
                 mask = mask.repeat(1, 1, query_length, 1)
-            # cast max to boolean
-            attn_weights = self.scale_mask_softmax(scores, mask != 0)
 
-            # quick test
-            # tmp_attn_weights = nn.functional.softmax(scores.float()+mask.float(), dim=-1).type_as(
-            #    scores
-            # )
-
-            # assert torch.allclose(attn_weights,tmp_attn_weights)
+            # scale_mask_softmax casts mask to boolean
+            if (
+                self.scale_mask_softmax.is_kernel_available(*output_size)
+                and scores.dtype == torch.float32
+            ):
+                # this will try to run fp32 and fail in fused softmax unless we cast
+                if self.config.softmax_precision == "fp16":
+                    attn_weights = self.scale_mask_softmax(
+                        scores.to(torch.float16), mask != 0
+                    ).type_as(scores)
+                elif self.config.softmax_precision == "bf16":
+                    attn_weights = self.scale_mask_softmax(
+                        scores.to(torch.bfloat16()), mask != 0
+                    ).type_as(scores)
+                else:
+                    raise NotImplementedError()
+            else:
+                attn_weights = self.scale_mask_softmax(scores, mask != 0).type_as(
+                    scores
+                )
 
         elif self.config.softmax_type == "torch":
             attn_weights = nn.functional.softmax(scores.float(), dim=-1).type_as(scores)
