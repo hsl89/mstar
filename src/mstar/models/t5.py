@@ -378,7 +378,7 @@ class FusedT5Attention(nn.Module):
         if self.alibi_positional_bias.shape[2] >= query_length:
             return self.alibi_positional_bias[..., :query_length, :query_length]
         else:
-            logger.warning(
+            logger.info(
                 "Recreating alibi positional bias to meet longer sequence length"
             )
             self.create_alibi_bias(query_length, key_length, self.alibi_dtype)
@@ -552,7 +552,8 @@ class FusedT5Attention(nn.Module):
 
             if not self.scale_mask_softmax.is_kernel_available(*output_size):
                 logger.warning(
-                    "Selected fused softmax but it is not available for given output size"
+                    "Selected fused softmax but it is not available for given output size\n"
+                    "Falling back to slower torch softmax"
                 )
 
             if mask.shape[2] != query_length:
@@ -576,7 +577,7 @@ class FusedT5Attention(nn.Module):
                     ).type_as(scores)
                 elif self.config.softmax_precision == "bf16":
                     attn_weights = self.scale_mask_softmax(
-                        scores.to(torch.bfloat16()), mask != 0
+                        scores.to(torch.bfloat16), mask != 0
                     ).type_as(scores)
                 else:
                     raise NotImplementedError()
