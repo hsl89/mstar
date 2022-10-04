@@ -42,7 +42,7 @@ RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/var/lib/
     cd aws-efa-installer && \
     ./efa_installer.sh -y -g -d --skip-kmod --skip-limit-conf --no-verify && \
     cd /usr/local/src && rm -rf aws-efa-installer-latest.tar.gz aws-efa-installer && \
-    cd /usr/local/src && git clone -b v2.12.12-1 https://github.com/NVIDIA/nccl.git && cd nccl && \
+    cd /usr/local/src && git clone -b v2.13.4-1 https://github.com/NVIDIA/nccl.git && cd nccl && \
     make -j src.build CUDA_HOME=/usr/local/cuda \
       NVCC_GENCODE="-gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_75,code=sm_75 -gencode=arch=compute_70,code=sm_70" && \
       make install && \
@@ -78,8 +78,3 @@ COPY DeepSpeed-ZeRO-2D.tar.gz /usr/local/src/DeepSpeed-ZeRO-2D.tar.gz
 RUN --mount=type=cache,target=/root/.cache/pip --mount=type=cache,target=/root/.ccache  \
     TORCH_CUDA_ARCH_LIST="8.0 7.5 7.0" DS_BUILD_UTILS=1 DS_BUILD_FUSED_LAMB=0 python3 -m pip install /usr/local/src/DeepSpeed-ZeRO-2D.tar.gz --no-build-isolation && \
     rm /usr/local/src/DeepSpeed-ZeRO-2D.tar.gz
-
-RUN --mount=type=cache,target=/root/.cache/pip --mount=type=cache,target=/root/.ccache  \
-    python3 -m pip install fairscale --no-build-isolation && \
-    TORCH_CUDA_ARCH_LIST="8.0 7.5 7.0" python3 -m pip install --global-option="--cpp_ext" --global-option="--cuda_ext" \
-        git+https://github.com/NVIDIA/apex.git@684c4733b1d44f6edfe4b190bf0cc55eb1ae1940 --no-build-isolation

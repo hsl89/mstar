@@ -1,5 +1,5 @@
 ## Base docker image built on Dockerfile.mstar.base
-FROM 747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-gitlab:base1.4 as base
+FROM 747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-gitlab:base1.6 as base
 LABEL maintainer="MStar Team"
 
 # Install zero-2d compatible pytorch-lightning
