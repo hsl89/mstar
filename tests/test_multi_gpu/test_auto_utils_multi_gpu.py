@@ -1,6 +1,28 @@
 import torch
+import torch.multiprocessing as mp
 from mstar import AutoModel
 from accelerate import infer_auto_device_map
+from mstar.AutoTokenizer import from_pretrained as tok_from_pretrained
+from mstar.AutoModel import from_pretrained as model_from_pretrained
+
+def worker1(rank):
+    torch.cuda.set_device(rank)
+    tokenizer = tok_from_pretrained("atm-PreLNSeq2Seq-5B")
+    print(tokenizer("hello world"))
+
+
+def test_tokenizer_concurrent_write():
+    mp.spawn(worker1, nprocs=4, args=())
+
+
+def worker2(rank):
+    torch.cuda.set_device(rank)
+    model = model_from_pretrained("mstar-t5-1-9B-bedrock-alexatm")
+
+
+def test_model_concurrent_write():
+    mp.spawn(worker2, nprocs=2, args=())
+
 
 def test_auto_model_device_map():
     ## Test for mstar models gpt2 with infer_auto_device_map

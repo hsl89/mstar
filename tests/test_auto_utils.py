@@ -1,5 +1,6 @@
 import os
 import torch
+import torch.multiprocessing as mp
 from mstar.AutoTokenizer import from_pretrained as tok_from_pretrained
 from mstar.AutoModel import from_pretrained as model_from_pretrained
 from mstar.AutoConfig import from_pretrained as config_from_pretrained
@@ -138,6 +139,16 @@ def test_get_config_file_from_s3():
     config = config_from_pretrained("atm-DistilledBERT-170M")
     assert config.hidden_act == "gelu"
     assert config.architectures == ["BertModel"]
+
+
+def worker(rank):
+    tokenizer = tok_from_pretrained("atm-PreLNSeq2Seq-5B")
+    print(tokenizer("hello world"))
+
+
+def test_tokenizer_concurrent_write():
+    mp.spawn(worker, nprocs=8, args=())
+
 
 
 def test_load_model_file_with_args():
