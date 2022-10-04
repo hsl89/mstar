@@ -1,4 +1,5 @@
 import os
+import torch
 from mstar.AutoTokenizer import from_pretrained as tok_from_pretrained
 from mstar.AutoModel import from_pretrained as model_from_pretrained
 from mstar.AutoConfig import from_pretrained as config_from_pretrained
@@ -137,3 +138,32 @@ def test_get_config_file_from_s3():
     config = config_from_pretrained("atm-DistilledBERT-170M")
     assert config.hidden_act == "gelu"
     assert config.architectures == ["BertModel"]
+
+
+def test_load_model_file_with_args():
+    key = "mstar-bert-tiny"
+    revision = "test"
+
+    # For original model, with configs from s3://mstar-models
+    model = model_from_pretrained(key, revision=revision)
+
+    assert model.config.attention_probs_dropout_prob == 0.1
+    assert model.config.use_cache == True
+    assert model.config.torch_dtype == torch.float32
+
+    # For updated model, by taking inputs from from_pretrained
+    model = model_from_pretrained(key, revision=revision, attention_probs_dropout_prob=0.2, torch_dtype=torch.bfloat16, use_cache=False)
+
+    assert model.config.attention_probs_dropout_prob == 0.2
+    assert model.config.use_cache == False
+    assert model.config.torch_dtype == torch.bfloat16
+
+    key = "mstar-t5-1-9B-bedrock"
+    revision = "stage_2_clm"
+
+    # Test bedrock model
+    model = model_from_pretrained(key, revision=revision)
+    assert model.config.softmax_type == "mstar_fused"
+
+    model = model_from_pretrained(key, revision=revision, softmax_type="torch")
+    assert model.config.softmax_type == "torch"

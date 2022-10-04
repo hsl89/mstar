@@ -32,9 +32,9 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
     """
     # args used for loading mstar models
     # Shared args among mstar and hf models.
-    force_download = kwargs.get("force_download", None)
-    revision = kwargs.get("revision", 'main')
-    cache_dir = kwargs.get("cache_dir", None)
+    force_download = kwargs.pop("force_download", None)
+    revision = kwargs.pop("revision", 'main')
+    cache_dir = kwargs.pop("cache_dir", None)
     config = None
     if os.path.isdir(pretrained_model_name_or_path):
         # Load config file.
@@ -46,7 +46,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
             AutoConfig.register(model_type, config_dict[model_type])
             AutoModel.register(config_dict[model_type], model_class_dict[model_type])
             print(f"Loading mstar config from {pretrained_model_name_or_path}")
-            config = AutoConfig.from_pretrained(pretrained_model_name_or_path)
+            config = AutoConfig.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
         else:
             print(f"Loading huggingface config from {pretrained_model_name_or_path}")
             return AutoConfig.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
@@ -60,7 +60,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
                 config_path = f"{downloaded_folder}/config.json"
                 with open(config_path, encoding='utf-8') as infile:
                     model_config = json.load(infile)
-                return AutoConfig.from_pretrained(downloaded_folder)
+                return AutoConfig.from_pretrained(downloaded_folder, *inputs, **kwargs)
             else:
                 # Load HF configs
                 print(f"Loading huggingface config from {pretrained_model_name_or_path}")
@@ -72,5 +72,5 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
         # Downlaod from s3. 
         downloaded_folder = get_config_file_from_s3(key, revision, force_download=force_download, cache_dir=cache_dir)
         print(f"Loading mstar config {key}")
-        config = AutoConfig.from_pretrained(downloaded_folder)  
+        config = AutoConfig.from_pretrained(downloaded_folder, *inputs, **kwargs)  
     return config

@@ -84,10 +84,10 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
     """
     # args used for loading mstar models
     # Shared args among mstar and hf models.
-    force_download = kwargs.get("force_download", None)
-    revision = kwargs.get("revision", "main")
-    cache_dir = kwargs.get("cache_dir", None)
-    device_map = kwargs.get("device_map", None)
+    force_download = kwargs.pop("force_download", None)
+    revision = kwargs.pop("revision", "main")
+    cache_dir = kwargs.pop("cache_dir", None)
+    device_map = kwargs.pop("device_map", None)
     model = None
     if os.path.isdir(pretrained_model_name_or_path):
         # Load config file.
@@ -99,7 +99,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
             AutoConfig.register(model_type, config_dict[model_type])
             AutoModel.register(config_dict[model_type], model_class_dict[model_type])
             print(f"Loading mstar model from {pretrained_model_name_or_path}")
-            model = AutoModel.from_pretrained(pretrained_model_name_or_path, device_map=device_map)
+            model = AutoModel.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs, device_map=device_map)
         else:
             print(f"Loading huggingface model from {pretrained_model_name_or_path}")
             return AutoModel.from_pretrained(
@@ -119,6 +119,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
                     model_config = json.load(infile)
                 return get_auto_function(model_config).from_pretrained(
                     downloaded_folder,
+                    *inputs, **kwargs,
                     device_map=device_map
                 )
             else:
@@ -136,5 +137,5 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
             key, revision, force_download=force_download, cache_dir=cache_dir
         )
         print(f"Loading mstar model {key}")
-        model = AutoModel.from_pretrained(downloaded_folder, device_map=device_map)  
+        model = AutoModel.from_pretrained(downloaded_folder, *inputs, **kwargs, device_map=device_map)  
     return model

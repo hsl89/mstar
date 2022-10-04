@@ -17,8 +17,8 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
         pretrained_model_name_or_path ([type]): name of/path to the tokenizer
     """
     # Shared args among mstar and hf models.
-    revision = kwargs.get("revision", 'main')
-    cache_dir = kwargs.get("cache_dir", None)
+    revision = kwargs.pop("revision", 'main')
+    cache_dir = kwargs.pop("cache_dir", None)
     if os.path.isdir(pretrained_model_name_or_path):
         # Load config file.
         config_path = f"{pretrained_model_name_or_path}/tokenizer_config.json"
@@ -35,7 +35,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
                 AutoTokenizer.register(config_dict[model_type], fast_tokenizer_class=tokenizer_class)
             else:
                 AutoTokenizer.register(config_dict[model_type], slow_tokenizer_class=tokenizer_class)
-            tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path)
+            tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
         else:
             print(f"Loading huggingface tokenizer from {pretrained_model_name_or_path}\n")    
             tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
@@ -58,7 +58,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
                 AutoTokenizer.register(config_dict[model_type], fast_tokenizer_class=tokenizer_class)
             else:
                 AutoTokenizer.register(config_dict[model_type], slow_tokenizer_class=tokenizer_class)
-            tokenizer = AutoTokenizer.from_pretrained(downloaded_folder)
+            tokenizer = AutoTokenizer.from_pretrained(downloaded_folder, *inputs, **kwargs)
         else:
             if model_type.startswith("mstar") or model_type.startswith("atm"):
                 model_type = "-".join(pretrained_model_name_or_path.split("-")[:2])
@@ -74,7 +74,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
                     AutoTokenizer.register(config_dict[model_type], fast_tokenizer_class=tokenizer_class)
                 else:
                     AutoTokenizer.register(config_dict[model_type], slow_tokenizer_class=tokenizer_class)
-                tokenizer = AutoTokenizer.from_pretrained(downloaded_folder)
+                tokenizer = AutoTokenizer.from_pretrained(downloaded_folder, *inputs, **kwargs)
             else:
                 print(f"Loading huggingface tokenizer {pretrained_model_name_or_path}\n")
                 tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
