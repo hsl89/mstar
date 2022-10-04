@@ -1,0 +1,21 @@
+{
+  "model_type": "m5-Bert",
+  "architectures": [
+    "M5BertForPreTrainingPreLN"
+  ],
+  "attention_probs_dropout_prob": 0.1,
+  "hidden_act": "gelu",
+  "hidden_dropout_prob": 0.1,
+  "hidden_size": 2560,
+  "initializer_range": 0.02,
+  "intermediate_size": 10240,
+  "max_position_embeddings": 512,
+  "num_attention_heads": 40,
+  "num_hidden_layers": 63,
+  "pruned_attention_heads": null,
+  "type_vocab_size": 1,
+  "vocab_size": 512040,
+  "use_fused_softmax": true,
+  "scale_with_layer_number": true,
+  "bf16": true
+}

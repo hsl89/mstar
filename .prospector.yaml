@@ -1,5 +1,8 @@
 max-line-length: 300
 
+ignore-paths:
+  - src/mstar/models/m5_models/bert.py # Track in issue https://gitlab.aws.dev/mstar/mstar/-/issues/20
+
 pyflakes:
   disable:
     - F401

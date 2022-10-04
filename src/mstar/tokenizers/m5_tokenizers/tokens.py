@@ -1,0 +1,11 @@
+UNK_TOKEN = "[UNK]"
+PAD_TOKEN = "[PAD]"
+MASK_TOKEN = "[MASK]"
+SEP_TOKEN = "[SEP]"
+CLS_TOKEN = "[CLS]"
+
+SPM_UNK_TOKEN = "<unk>"
+SPM_PAD_TOKEN = "<pad>"
+
+WPIECE_UNDERLINE = "##"
+SPIECE_UNDERLINE = "▁"

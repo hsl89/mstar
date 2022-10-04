@@ -38,7 +38,7 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
             tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
         else:
             print(f"Loading huggingface tokenizer from {pretrained_model_name_or_path}\n")    
-            tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
+            tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, *inputs, revision=revision, cache_dir=cache_dir, **kwargs)
     else:
         if not isinstance(pretrained_model_name_or_path, str):
             raise ValueError(
@@ -77,5 +77,5 @@ def from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs):
                 tokenizer = AutoTokenizer.from_pretrained(downloaded_folder, *inputs, **kwargs)
             else:
                 print(f"Loading huggingface tokenizer {pretrained_model_name_or_path}\n")
-                tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
+                tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, *inputs, revision=revision, cache_dir=cache_dir, **kwargs)
     return tokenizer
