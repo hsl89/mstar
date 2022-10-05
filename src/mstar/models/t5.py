@@ -565,6 +565,10 @@ class FusedT5Attention(nn.Module):
                 ), "Fused softmax does not support per-head mask"
                 mask = mask.repeat(1, 1, query_length, 1)
 
+            # move mask to the same device as scores
+            # allow to run inference with model.parallelize
+            mask = mask.to(scores.device)
+
             # scale_mask_softmax casts mask to boolean
             if (
                 self.scale_mask_softmax.is_kernel_available(*output_size)
