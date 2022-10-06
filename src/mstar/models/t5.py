@@ -35,6 +35,7 @@ from transformers.modeling_outputs import (
     Seq2SeqModelOutput,
 )
 
+import numpy as np
 
 class MStarT5Config(PretrainedConfig):
     r"""
@@ -133,6 +134,10 @@ class MStarT5Config(PretrainedConfig):
             "t5",
             "alibi",
         ], f"Positional embedding {positional_embedding} not supported"
+
+        if positional_embedding=='alibi':
+            assert self.use_fused_attention, "Currently alibi only supported via M* attention"
+
         self.positional_embedding = positional_embedding
 
         act_info = self.feed_forward_proj.split("-")
@@ -165,9 +170,9 @@ def get_slopes(n):
     """Utility function for alibi"""
 
     def get_slopes_power_of_2(n):
-        start = 2 ** (-2 ** -(math.log2(n) - 3))
+        start = 2 ** (-(2 ** -(math.log2(n) - 3)))
         ratio = start
-        return [start * ratio ** i for i in range(n)]
+        return [start * ratio**i for i in range(n)]
 
     if math.log2(n).is_integer():
         return get_slopes_power_of_2(n)
@@ -193,9 +198,22 @@ def get_alibi(maxpos, attn_heads):
     relative_position = (
         torch.abs(relative_position).unsqueeze(0).expand(attn_heads, -1, -1)
     )
-    slopes = torch.Tensor(get_slopes(attn_heads)) * -1.0
-    new_alibi = slopes.unsqueeze(1).unsqueeze(1) * relative_position
-    return new_alibi
+    # when in deepspeed context, deepspeed tensor initialization
+    # will pass the input to torch.zeros
+    # therefore we need to pass a size, not values, as input
+    slopes = torch.zeros(attn_heads)
+    # deepspeed context will assign a dtype and device to slopes
+    current_device = slopes.device
+    current_dtype = slopes.dtype
+    # perform operations in float on cpu so that we can use numpy
+    slopes = slopes.to(torch.float).to("cpu") - np.array(get_slopes(attn_heads))
+    # cast back to correct device/dtype
+    # to match devices during deepspeed init
+    slopes = slopes.to(current_device).to(current_dtype)
+    relative_position = relative_position.to(slopes.device)
+    alibi = slopes.unsqueeze(1).unsqueeze(1) * relative_position
+
+    return alibi
 
 
 def attention_mask_func(attention_scores, attention_mask):
