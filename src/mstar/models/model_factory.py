@@ -24,7 +24,7 @@ from mstar.tokenizers.gptbart import GPT2BartTokenizer
 from mstar.tokenizers.sentencepiece import SentencepieceTokenizer
 from mstar.tokenizers.atm_tokenizers import ATMTokenizerFast, MT5TokenizerFastWithMask
 from mstar.tokenizers.m5_tokenizers import M5SentencepieceTokenizer
-from transformers import GPT2Tokenizer, T5Tokenizer
+from transformers import GPT2Tokenizer, T5Tokenizer, RobertaTokenizer
 
 config_dict = {
     "mstar-gpt2": MStarGPT2Config,
@@ -37,6 +37,7 @@ config_dict = {
     "atm-MT5ForMaskedLM": MT5ForMaskedLMConfig,
     "mstar-t5": MStarT5Config,
     "m5-Bert": M5BertConfig,
+    "mstar-bert": M5BertConfig,
 }
 
 model_class_dict = {
@@ -50,6 +51,7 @@ model_class_dict = {
     "atm-MT5ForMaskedLM": MT5ForMaskedLM,
     "mstar-t5": MStarT5ForConditionalGeneration,
     "m5-Bert": M5BertForPreTrainingPreLN,
+    "mstar-bert": M5BertForPreTrainingPreLN,
 }
 
 tokenizer_class_dict = {
@@ -63,6 +65,7 @@ tokenizer_class_dict = {
     "atm-MT5ForMaskedLM": [MT5TokenizerFastWithMask],
     "mstar-t5": [T5Tokenizer, SentencepieceTokenizer],
     "m5-Bert": [M5SentencepieceTokenizer],
+    "mstar-bert": [RobertaTokenizer],
 }
 
 
@@ -74,4 +77,5 @@ tokenizer_mapping = {
     "T5Tokenizer": T5Tokenizer,
     "SentencepieceTokenizer": SentencepieceTokenizer,
     "M5SentencepieceTokenizer": M5SentencepieceTokenizer,
+    "RobertaTokenizer": RobertaTokenizer
 }

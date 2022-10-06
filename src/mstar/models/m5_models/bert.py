@@ -924,7 +924,7 @@ class M5BertConfig(PretrainedConfig):
             Reference (Megatron-LM): 
             https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/model/gpt_model.py
     """
-    model_type = "m5-Bert"
+    model_type = "mstar-bert"
 
     def __init__(
         self,
