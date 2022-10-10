@@ -123,15 +123,15 @@ class AWSBatchProgressBar(ProgressBarBase):
     def on_train_batch_end(  # pylint: disable=unused-argument, arguments-renamed
         self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
     ):
-        self._train_batch_idx += 1
-        if self._train_batch_idx % self._refresh_rate == 0:
+        self.train_batch_idx += 1
+        if self.train_batch_idx % self._refresh_rate == 0:
             it_per_seconds = self._refresh_rate / (
                 time.time() - self._last_batch_end_logged
             )
             self._last_batch_end_logged = time.time()
             self.print(
-                f"[Epoch {self._train_epoch_idx} Batch {self._train_batch_idx} "
-                f"It/s {it_per_seconds:.3f} Hours left {(self._total_steps - self._train_batch_idx)/it_per_seconds/3600:.2f}]:",
+                f"[Epoch {self._train_epoch_idx} Batch {self.train_batch_idx} "
+                f"It/s {it_per_seconds:.3f} Hours left {(self._total_steps - self.train_batch_idx)/it_per_seconds/3600:.2f}]:",
                 self.trainer.progress_bar_dict,
             )
 
@@ -142,6 +142,7 @@ class MStarEKSLogger(LightningLoggerBase):
         experiment_name: str = os.getenv("MSTAR_TRAINING_JOB_NAME"),
         run_name: Optional[str] = None,
         tags: Optional[Dict[str, Any]] = {"mode": "training"},
+        s3_upload=False,
     ):
         super().__init__()
 
@@ -151,6 +152,7 @@ class MStarEKSLogger(LightningLoggerBase):
         self._run_id = None
         tags['job_id'] = os.environ.get('JOB_NAME', None)
         self.tags = tags
+        self.s3_upload = s3_upload
 
         self._mlflow_client = MlflowClient(TRACKING_URI)
 
@@ -327,5 +329,9 @@ class MStarEKSLogger(LightningLoggerBase):
 
     @rank_zero_only
     def after_save_checkpoint(self, checkpoint_callback: ModelCheckpoint):
-        if os.path.exists(checkpoint_callback.best_model_path):
-            self.experiment.log_artifact(self.run_id, checkpoint_callback.best_model_path)
+        if self.s3_upload:
+            if os.path.exists(checkpoint_callback.best_model_path):
+                try:
+                    self.experiment.log_artifact(self.run_id, checkpoint_callback.best_model_path)
+                except Exception as e:
+                    logger.warning("Failed to upload checkpoints...")
