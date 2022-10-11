@@ -54,9 +54,10 @@ build_push_image:
     - gpu
   script:
     - export AWS_SDK_LOAD_CONFIG=true
+    - export NEW_CI_COMMIT_REF_NAME="$(echo $CI_COMMIT_REF_NAME | sed -r 's/\//_/g')"
     - >-
       /kaniko/executor
       --context "${CI_PROJECT_DIR}"
       --dockerfile "${CI_PROJECT_DIR}/tools/docker/Dockerfile"
-      --destination "747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-gitlab:$CI_COMMIT_REF_NAME"
+      --destination "747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-gitlab:$NEW_CI_COMMIT_REF_NAME"
       --cache=true

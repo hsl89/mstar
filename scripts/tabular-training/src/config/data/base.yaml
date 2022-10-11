@@ -1,0 +1,10 @@
+num_workers: 8
+collator_output_targets: t5
+max_seq_length: 2048
+mean_noise_span: 3.0
+mlm_prob: 0.1665
+training_dataset: /mnt/colehawk/pile_no_youtube/train_packed_chunksize_2600.arrow
+train_data_index_path: /mnt/colehawk/pile_no_youtube/indices/64_gpus/train/
+valid_data_index_path: /mnt/colehawk/pile_no_youtube/indices/64_gpus/val/
+validation_dataset: /mnt/colehawk/pile_no_youtube/val_packed_chunksize_2600.arrow
+tokenizer: t5-base

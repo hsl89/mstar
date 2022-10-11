@@ -1,0 +1,7 @@
+{
+    "prescale_gradients": false,
+    "zero_optimization": {
+        "stage": 2
+    },
+    "zero_allow_untested_optimizer": true
+}
