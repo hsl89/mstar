@@ -1,0 +1,35 @@
+ckpt_path: null
+gradient_checkpointing: true
+tokenizer_path: null
+use_hf_constructor: false
+return_dict: true
+output_hidden_states: false
+output_attentions: false
+torchscript: false
+torch_dtype: null
+use_bfloat16: false
+tie_word_embeddings: false
+n_positions: 512
+output_past: true
+vocab_size: 32128
+d_model: 2048
+d_kv: 128
+d_ff: 8192
+num_layers: 12
+num_decoder_layers: 12
+num_heads: 16
+relative_attention_num_buckets: 32
+dropout_rate: 0.0
+layer_norm_epsilon: 0.000001
+feed_forward_proj: gated-gelu
+dense_act_fn: gelu
+use_cache: false
+use_fused_attention: true
+decoder_start_token_id: 0
+initializer_factor: 0.2
+pretrained_path: 0 #use to specify automodel path
+positional_embedding: t5
+#use fused softmax, probably redundancy here
+fused_scaled_masked_softmax: true
+fused_attention: true
+softmax_type: mstar_fused

@@ -1,0 +1,30 @@
+args:
+- pretrain_main.py
+- run_name=11B_stage_2_bart
+- optimizer.base_learning_rate=0.00005
+- model.positional_embedding=alibi
+- trainer.limit_val_batches=100
+- trainer.precision=bf16 
+- trainer.num_sanity_val_steps=0
+- data=drop_2_stage_2_bart
+- data.clm_max_doc=4
+- optimizer.warmup_steps=3000
+- trainer.max_steps=25000
+- optimizer.lr_scheduler_type=linear 
+- model=11B
+- deepspeed_path=config/deepspeed/bf16_zero2d_shard16.json 
+- ++model.load_method=safe_state_dict 
+- ++model.state_dict_path=/mnt/colehawk/bedrock_prod_automodels/stage_2/11B/alexatm/pytorch_model_tmp.bin
+- trainer.num_nodes=64
+- optimizer.micro_batch_size=2
+- optimizer.total_batch_size=1024
+- trainer.limit_val_batches=25
+- trainer.val_check_interval=2500
+- callback.save_every_n_train_steps=2500
+- ++data.autotokenizer_path=/mnt/colehawk/bedrock_prod_automodels/tokenizer/
+command:
+- /usr/bin/python3
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock_drop_3
+name: test-chawk-bdrk-11B-alexatm
+node_num: 4
+node_type: p4d.24xlarge

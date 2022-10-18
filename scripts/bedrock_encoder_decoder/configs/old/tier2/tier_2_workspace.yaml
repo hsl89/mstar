@@ -1,0 +1,4 @@
+name: "tier2eval-workspace-colehawk"
+node_type: "p3dn.24xlarge"
+node_num: 1
+image: 747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-eks:adirawal-tier2-aug3_more_tasks

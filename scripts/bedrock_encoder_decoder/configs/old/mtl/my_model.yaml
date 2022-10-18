@@ -1,0 +1,15 @@
+name: "colehawk-mtl-bdrck-1-9B"
+node_type: "p4d.24xlarge"
+node_num: 16
+image: "747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-eks:adirawal-mtl_aug22"
+command: ["/bin/bash"]
+args: [
+ "scripts/t50_launch.sh",
+ "cole_aug22_bdrk_1_9B",
+ "48",
+ "0",
+ "1",
+ "100000",
+ "/mnt/colehawk/easel_models/to_evaluate/t5_loss/hf_version",
+ "512",
+]

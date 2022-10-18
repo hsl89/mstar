@@ -1,0 +1,15 @@
+name: "tier2eval-hawk"
+node_type: "p4d.24xlarge"
+node_num: 1
+image: 747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-eks:adirawal-tier2-aug3_more_tasks
+command: ["/usr/bin/python3", "main_eks.py"]
+args: [
+    "--model", "hf-seq2seq",
+    "--model_args", "pretrained=/mnt/colehawk/easel_models/to_evaluate/first_tier2_t5/hf_version,tokenizer=/mnt/colehawk/easel_models/to_evaluate/first_tier2_t5/tokenizer",
+    "--output_directory", "/mnt_out/colehawk/tier2_eval_results/first_tier2_t5",
+    "--device", "cuda",
+    "--num_fewshot", "0",
+    "--tasks", "superglue_rte,wic,sst,wsc,cb,anli_r1,anli_r3,multirc,qqp,boolq",
+    "--batch_size", "16",
+    "--no_cache"
+]

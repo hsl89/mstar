@@ -1,0 +1,25 @@
+args:
+- pretrain_main.py
+- run_name=20B_stage_2_t5
+- optimizer.base_learning_rate=0.0001
+- model.positional_embedding=alibi
+- trainer.limit_val_batches=100
+- trainer.precision=bf16 
+- trainer.num_sanity_val_steps=0
+- data=drop_3_stage_2_t5
+- trainer.max_steps=50000
+- optimizer.lr_scheduler_type=linear 
+- model=20B
+- deepspeed_path=config/deepspeed/bf16_zero2d_shard24.json 
+- ++model.load_method=safe_state_dict 
+- ++model.state_dict_path=/mnt_out/colehawk/easel/20b_stage_1_ckpt/blah_blah
+- optimizer.micro_batch_size=2
+- ++data.autotokenizer_path=/mnt/colehawk/bedrock_prod_automodels/tokenizer/
+- trainer.num_nodes=210
+- optimizer.total_batch_size=3360
+command:
+- /usr/bin/python3
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock_drop_3
+name: chawk-bdrk-20B-t5
+node_num: 210 #divisible by 3 
+node_type: p4d.24xlarge

@@ -1,0 +1,17 @@
+num_workers: 8
+collator_output_targets: mixed_bart_clm
+max_seq_length: 2048
+mean_noise_span: 3.0
+mlm_prob: 0.1
+clm_mix_ratio: 0.0
+clm_max_doc: 0 #the clm_mix_ratio is not super-effective
+keep_sentinel_ids: 0 #forces un-masked infilling
+training_dataset1: /mnt/colehawk/pile_no_youtube_repacked/train_packed_chunksize_2600.arrow
+
+training_dataset2: /mnt/reddit_easel/arrow_files/train_packed_chunksize_2600.arrow
+validation_dataset1: /mnt/colehawk/pile_no_youtube_repacked/val_packed_chunksize_2600.arrow
+validation_dataset2: /mnt/reddit_easel/arrow_files/val_packed_chunksize_2600.arrow
+tokenizer: t5-base
+extra_tokenizer_ids: 2000 #these can be useful in downstream tasks
+new_datamodule: 1
+source: 'unlabeled_mixed'

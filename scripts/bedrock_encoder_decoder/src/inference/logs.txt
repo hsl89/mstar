@@ -1,0 +1,9 @@
+Loading mstar model mstar-t5-1-9B-bedrock
+Loading mstar tokenizer mstar-t5-1-9B-bedrock
+
+TOKENIZED
+{'input_ids': tensor([[32099,   432, 12946,  2807,    13,  3736,    26,     9,   159,    51,
+           469,     1]]), 'attention_mask': tensor([[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])}
+GENERATED
+Prompt: <extra_id_0> All mainstream forms of Judaism today
+Continuation: ['<pad> have a strong tradition of observance. The observance of the Jewish holidays is a central part of Jewish life. The Jewish holidays are a time of reflection and celebration. The Jewish holidays are a time of re']

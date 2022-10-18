@@ -1,0 +1,19 @@
+args:
+- pretrain_main.py
+- run_name=subword_1_9B_t5_prod_cand
+- trainer.max_steps=500000
+- optimizer.base_learning_rate=0.0005
+- trainer.num_nodes=8
+- optimizer.micro_batch_size=8
+- optimizer.total_batch_size=512
+- data=t5_reddit
+- data.tokenizer=t5_subword_sampling
+- model.positional_embedding=alibi
+- model.ckpt_path=/mnt_out/colehawk/easel/subword_1_9B_t5_prod_cand/09_04_17_57/epoch\=0-step\=200000-validation_loss\=1.0975_training_loss_step\=0.8560.ckpt/
+command:
+- /usr/bin/python3
+gpu: 8
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-easel
+name: chawk-esl-t5-1-9B-subword-resume
+node_num: 8
+node_type: p4d.24xlarge

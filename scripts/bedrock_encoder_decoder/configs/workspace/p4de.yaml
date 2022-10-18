@@ -1,0 +1,4 @@
+name: "colehawk-bdrk-package"
+node_type: "p4de.24xlarge"
+node_num: 1
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock_new_dev

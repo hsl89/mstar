@@ -1,0 +1,13 @@
+num_workers: 8
+collator_output_targets: t5
+max_seq_length: 2048
+max_output_length: 1024
+mean_noise_span: 3.0
+mlm_prob: 0.1665
+keep_sentinel_ids: null
+training_datasets: ['/mnt/pretraining-data/package-09-22-22-v1/train1_packed_chunksize_2600.arrow','/mnt/pretraining-data/package-09-22-22-v1/train2_packed_chunksize_2600.arrow','/mnt/pretraining-data/package-09-29-22-v1/train1_packed_chunksize_2600.arrow','/mnt/pretraining-data/package-09-29-22-v1/train2_packed_chunksize_2600.arrow']
+validation_datasets: ['/mnt/pretraining-data/package-09-22-22-v1/val_packed_chunksize_2600.arrow','/mnt/pretraining-data/package-09-29-22-v1/val_packed_chunksize_2600.arrow']
+tokenizer: t5-base
+extra_tokenizer_ids: 2000 #these can be useful in downstream tasks
+new_datamodule: 1
+source: 'mix_from_lists'

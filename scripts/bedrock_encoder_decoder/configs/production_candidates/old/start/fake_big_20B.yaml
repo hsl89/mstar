@@ -1,0 +1,25 @@
+args:
+- pretrain_main.py
+- run_name=20B_t5_prod_candidate
+- trainer.max_steps=2000000
+- optimizer.base_learning_rate=0.0002
+- trainer.num_nodes=2
+- optimizer.micro_batch_size=4
+- optimizer.total_batch_size=64
+- data=t5_reddit
+- model=20B
+- model.positional_embedding=alibi
+- deepspeed_path=config/deepspeed/bf16_zero2d.json
+- trainer.precision=bf16 
+- trainer.num_sanity_val_steps=0
+- model.ckpt_path=null
+- trainer.val_check_interval=25
+- trainer.limit_val_batches=5
+- callback.save_every_n_train_steps=25
+- optimizer.warmup_steps=50 
+command:
+- /usr/bin/python3
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock
+name: test-big-resume-chawk-esl-t5-20B
+node_num: 2
+node_type: p4de.24xlarge

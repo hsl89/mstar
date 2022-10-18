@@ -1,0 +1,18 @@
+args:
+- pretrain_main.py
+- run_name=1_9B_mix_prod_candidate_resume
+- trainer.max_steps=195100
+- optimizer.base_learning_rate=0.0001
+- trainer.num_nodes=8
+- optimizer.micro_batch_size=8
+- optimizer.total_batch_size=512
+- data=mix_high_mask_reddit
+- model.positional_embedding=alibi
+- model.ckpt_path=/mnt_out/colehawk/easel/1_9B_mix_prod_candidate_resume/09_06_01_17/epoch\=0-step\=195000-validation_loss\=0.5897_training_loss_step\=0.4781.ckpt/
+command:
+- /usr/bin/python3
+gpu: 8
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-easel
+name: chawk-test-resume
+node_num: 8
+node_type: p4d.24xlarge

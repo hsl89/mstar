@@ -1,0 +1,4 @@
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-easel
+name: chawk-dev-test-resume-p4
+node_num: 1
+node_type: p4de.24xlarge

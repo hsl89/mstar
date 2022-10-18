@@ -1,0 +1,12 @@
+defaults:
+    - _self_
+    - trainer: collect
+    - optimizer: p3
+    - data: base
+    - model: base
+    - callback: base
+    - deepspeed: base
+
+run_name: collect
+experiment_name: easel-pretraining
+automodel_path: 'automodel_tmp'

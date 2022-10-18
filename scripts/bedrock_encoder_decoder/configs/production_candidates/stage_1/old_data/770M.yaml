@@ -1,0 +1,21 @@
+args:
+- pretrain_main.py
+- run_name=770M_t5_tabular
+- trainer.max_steps=500000
+- optimizer.base_learning_rate=0.0005
+- trainer.num_nodes=4
+- optimizer.micro_batch_size=16
+- optimizer.total_batch_size=512
+- data=t5_prod
+- model.positional_embedding=alibi
+- deepspeed_path=config/deepspeed/bf16_stage2.json
+- trainer.limit_val_batches=100
+- trainer.precision=bf16 
+- trainer.num_sanity_val_steps=2
+- model=770M
+command:
+- /usr/bin/python3
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock
+name: chawk-tabular-770m
+node_num: 4
+node_type: p4d.24xlarge

@@ -1,0 +1,17 @@
+args:
+- pretrain_main.py
+- run_name=mixed_bart_100B_high_mask
+- trainer.max_steps=100000
+- trainer.num_nodes=8
+- optimizer.micro_batch_size=8
+- optimizer.total_batch_size=512
+- optimizer.base_learning_rate=0.0001
+- data=mix #use mixed bart+clm
+- data.mlm_prob=0.2505
+command:
+- /usr/bin/python3
+gpu: 8
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-easel
+name: chawk-mix-100B-high-mask
+node_num: 8
+node_type: p4d.24xlarge

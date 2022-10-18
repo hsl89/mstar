@@ -1,0 +1,5 @@
+num_workers: 8
+source: mtl
+max_seq_length: 512
+tokenizer_path: t5-base
+new_datamodule: 1

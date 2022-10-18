@@ -1,0 +1,19 @@
+args:
+- pretrain_main.py
+- run_name=pile_tokenizer_50k_deduped_subword
+- trainer.max_steps=100000
+- optimizer.base_learning_rate=1e-4
+- trainer.num_nodes=8
+- optimizer.micro_batch_size=8
+- optimizer.total_batch_size=512
+- data=t5
+- data.tokenizer=pile_50k_deduped_subword
+
+
+command:
+- /usr/bin/python3
+gpu: 8
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-easel
+name: chawk-tokenizer-pile-subword-100B
+node_num: 8
+node_type: p4d.24xlarge

@@ -1,0 +1,25 @@
+args:
+- pretrain_main.py
+- run_name=stage_2_t5
+- optimizer.base_learning_rate=0.0001
+- model.positional_embedding=alibi
+- trainer.limit_val_batches=100
+- trainer.precision=bf16 
+- trainer.num_sanity_val_steps=0
+- data=stage_2_t5
+- trainer.max_steps=50000
+- optimizer.lr_scheduler_type=linear 
+- deepspeed_path=config/deepspeed/bf16_zero2d.json 
+- model=11B
+- ++model.load_method=safe_state_dict 
+- ++model.state_dict_path=/mnt_out/colehawk/easel/11b_ckpt/model_fp32_state_dict 
+- trainer.num_nodes=2
+- optimizer.micro_batch_size=4
+- optimizer.total_batch_size=32
+- ++data.autotokenizer_path=/mnt/colehawk/bedrock_prod_automodels/tokenizer/
+command:
+- /usr/bin/python3
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock_patch_state_dict
+name: test-chawk-bdrk-11B-t5
+node_num: 2
+node_type: p4d.24xlarge

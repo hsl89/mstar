@@ -1,0 +1,22 @@
+args:
+- pretrain_main.py
+- run_name=test_11B_t5_prod_candidate
+- trainer.max_steps=2000000
+- optimizer.base_learning_rate=0.0001
+- trainer.num_nodes=2
+- optimizer.micro_batch_size=2
+- optimizer.total_batch_size=32
+- data=t5_prod
+- model=11B
+- model.positional_embedding=alibi
+- deepspeed_path=config/deepspeed/bf16_zero2d.json
+- trainer.precision=bf16 
+- trainer.num_sanity_val_steps=0
+- trainer.limit_val_batches=50
+- model.ckpt_path=/mnt_out/colehawk/easel/11B_t5_prod_candidate/09_25_03_52/epoch\=0-step\=110000-validation_loss\=1.1241_training_loss_step\=1.2215.ckpt/
+command:
+- /usr/bin/python3
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock
+name: old-data-test-chawk-bdrk-t5-11B
+node_num: 2
+node_type: p4d.24xlarge

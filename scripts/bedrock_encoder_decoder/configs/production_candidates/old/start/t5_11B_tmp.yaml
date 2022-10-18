@@ -1,0 +1,20 @@
+args:
+- pretrain_main.py
+- run_name=11B_t5_prod_candidate
+- trainer.max_steps=1000000
+- optimizer.base_learning_rate=0.0001
+- trainer.num_nodes=2
+- optimizer.micro_batch_size=4
+- optimizer.total_batch_size=1024
+- data=t5_reddit
+- model=11B
+- model.positional_embedding=alibi
+- deepspeed_path=config/deepspeed/zero2d.json
+- trainer.num_sanity_val_steps=0
+command:
+- /usr/bin/python3
+gpu: 8
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-easel
+name: chawk-esl-t5-11B
+node_num: 32
+node_type: p4d.24xlarge

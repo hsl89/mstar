@@ -1,0 +1,12 @@
+num_workers: 8
+source: unlabeled
+collator_output_targets: bart
+max_seq_length: 2048
+mean_noise_span: 3.0
+mlm_prob: 0.1565 #chosen for softmax kernel availability and multiple of 64
+keep_sentinel_ids: 0
+training_dataset: /mnt/colehawk/pile_no_youtube_repacked/train_packed_chunksize_2600.arrow
+validation_dataset: /mnt/colehawk/pile_no_youtube_repacked/val_packed_chunksize_2600.arrow
+tokenizer: t5-base
+extra_tokenizer_ids: 2000 #these can be useful in downstream tasks
+new_datamodule: 1

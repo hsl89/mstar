@@ -1,0 +1,25 @@
+args:
+- pretrain_main.py
+- run_name=20B_t5_prod_candidate
+- trainer.max_steps=1000000
+- optimizer.base_learning_rate=0.0001
+- trainer.num_nodes=2
+- optimizer.micro_batch_size=4
+- optimizer.total_batch_size=64
+- data=t5_reddit
+- model=20B
+- ++model.positional_embedding=alibi
+- deepspeed_path=config/deepspeed/zero2d.json
+- trainer.num_sanity_val_steps=0
+- model.num_layers=2
+- model.num_decoder_layers=2
+- trainer.val_check_interval=50
+- trainer.limit_val_batches=5
+- callback.save_every_n_train_steps=50
+- model.ckpt_path=/mnt_out/colehawk/easel/20B_t5_prod_candidate/09_06_21_51/epoch\=0-step\=1250-validation_loss\=5.4526_training_loss_step\=5.4890.ckpt/
+command:
+- /usr/bin/python3
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock
+name: test-resume-early-chawk-esl-t5-20B
+node_num: 2
+node_type: p4d.24xlarge

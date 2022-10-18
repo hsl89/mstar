@@ -1,0 +1,16 @@
+num_workers: 8
+collator_output_targets: mixed_t5_clm
+clm_max_doc: 8
+clm_ratio: 0.5
+max_seq_length: 2048
+clm_max_output_length: 1024
+training_dataset1: '/mnt/pretraining-data/package-09-22-22-v1/train1_packed_chunksize_2600.arrow'
+training_dataset2: '/mnt/pretraining-data/package-09-22-22-v1/train2_packed_chunksize_2600.arrow'
+validation_dataset1: '/mnt/pretraining-data/package-09-22-22-v1/val_packed_chunksize_2600.arrow'
+tokenizer: t5-base
+extra_tokenizer_ids: 2000 #these can be useful in downstream tasks
+new_datamodule: 1
+source: 'unlabeled_mixed'
+resume_idx: null 
+mean_noise_span: 3.0
+mlm_prob: 0.1665

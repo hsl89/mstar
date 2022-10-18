@@ -1,0 +1,16 @@
+args:
+- pretrain_main.py
+- run_name=t5_large_batch_size_high_lr
+- trainer.max_steps=250000
+- optimizer.base_learning_rate=0.0007
+- trainer.num_nodes=8
+- optimizer.micro_batch_size=16
+- optimizer.total_batch_size=1024
+- data=t5
+command:
+- /usr/bin/python3
+gpu: 8
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-easel
+name: chawk-esl-t5
+node_num: 8
+node_type: p4d.24xlarge

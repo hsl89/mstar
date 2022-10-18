@@ -1,0 +1,15 @@
+name: "colehawk-mtl-t5-base"
+node_type: "p4d.24xlarge"
+node_num: 8
+image: "747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-eks:adirawal-mtl_aug22"
+command: ["/bin/bash"]
+args: [
+ "scripts/t50_launch.sh",
+ "cole_aug22_t5_base",
+ "96",
+ "0",
+ "1",
+ "100000",
+ "t5-base",
+ "512",
+]
