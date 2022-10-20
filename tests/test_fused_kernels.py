@@ -284,6 +284,26 @@ def test_layer_norm():
         )
 
 
+def test_fused_softmax_special_case():
+    scale_mask_softmax = FusedScaleMaskSoftmax(
+                    input_in_fp16=False,
+                    input_in_bf16=True,
+                    attn_mask_type=AttnMaskType.padding,
+                    scaled_masked_softmax_fusion=True,
+                    mask_func=attention_mask_func,
+                    softmax_in_fp32=True,
+                    scale=None,
+                )
+
+    scores = torch.load('./tests/data/fused_softmax_input.pt').to('cuda:0')
+    mask = torch.ones((16, 1, 4, 713), dtype=torch.bool).to('cuda:0')
+
+    attn_weights = scale_mask_softmax(
+        scores, mask
+    ).type_as(scores)
+    print(attn_weights)
+
+
 if __name__ == "__main__":
     try:
         from transformers import BertTokenizer, GPT2Tokenizer
