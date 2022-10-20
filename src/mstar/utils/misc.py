@@ -395,7 +395,7 @@ class BooleanOptionalAction(argparse.Action):
         return ' | '.join(self.option_strings)
 
 
-def wait_if_busy_fn(max_cpu, jitter, max_time, fn, /, *args, **kwargs):
+def wait_if_busy_fn(max_cpu, jitter, max_time, fn, *args, **kwargs):
     """Higher-order function for waiting up to a max time if cpu utilization exceeds set limit
     before executing the function.
 
@@ -450,7 +450,7 @@ def wait_if_busy(max_cpu, jitter, max_time=None):
     return decorator
 
 
-def with_env_fn(env_dict, fn, /, *args, **kwargs):
+def with_env_fn(env_dict, fn, *args, **kwargs):
     """Higher-order function for Override environment variables when executing."""
 
     assert all(isinstance(v, str) for v in env_dict.values()), \
