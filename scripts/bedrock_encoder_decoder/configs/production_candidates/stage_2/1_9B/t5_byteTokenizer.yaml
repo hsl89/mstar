@@ -1,0 +1,28 @@
+args:
+- pretrain_main.py
+- run_name=adirawal-bdrk-1-9B-stage2-t5
+- optimizer.base_learning_rate=0.00025
+- trainer.num_nodes=16
+- optimizer.micro_batch_size=4
+- optimizer.total_batch_size=512
+- model.positional_embedding=alibi
+- deepspeed_path=config/deepspeed/bf16_stage2.json
+- trainer.default_root_dir=/mnt_out/adirawal/bytetoken/
+- trainer.limit_val_batches=100
+- trainer.precision=bf16 
+- trainer.num_sanity_val_steps=2
+- data=stage_2_t5
+- trainer.max_steps=100000
+- optimizer.lr_scheduler_type=linear
+- data.training_dataset1='/mnt/pretraining-data/byte-tokenizer-data/package-09-29-22-v1/train1_packed_chunksize_3100.arrow'
+- data.training_dataset2='/mnt/pretraining-data/byte-tokenizer-data/package-09-29-22-v1/train2_packed_chunksize_3100.arrow'
+- data.validation_dataset1='/mnt/pretraining-data/byte-tokenizer-data/package-09-29-22-v1/val_packed_chunksize_3100.arrow'
+- ++model.load_method=automodel
+- ++model.automodel_path=/mnt/colehawk/bedrock_prod_automodels/stage_1/1_9B/ 
+- ++data.autotokenizer_path=/mnt/tokenizer/mstar-t5-sentencepiece-extra_ids_1920-byte_fallback/
+command:
+- /usr/bin/python3
+image: 747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-eks:ubuntu-bedrock_bytetokenizer_oct19
+name: adirawal-bdrk-1-9B-stage2-t5
+node_num: 16
+node_type: p4d.24xlarge

@@ -115,6 +115,8 @@ class T5DataCollatorForSpanCorruption:
             The pad token id of the model
         decoder_start_token_id: (:obj:`int):
             The decoder start token id of the model
+        clm_token: (:obj:`str):
+            Special token used for Language modeling (should not be used here) 
     """
 
     def __init__(
@@ -127,6 +129,7 @@ class T5DataCollatorForSpanCorruption:
         target_length: int,
         pad_token_id: int,
         decoder_start_token_id: int,
+        clm_token: str = CLM_TOKEN,
     ):
 
         logger.warning(
@@ -141,6 +144,8 @@ class T5DataCollatorForSpanCorruption:
         self.target_length = target_length
         self.pad_token_id = pad_token_id
         self.decoder_start_token_id = decoder_start_token_id
+        self.clm_token = clm_token
+        self.clm_token_id = self.tokenizer.convert_tokens_to_ids(self.clm_token)
 
     def __call__(
         self, batch, return_type="pt", testing: bool = False
@@ -222,7 +227,9 @@ class T5DataCollatorForSpanCorruption:
             sentinel_ids != 0, (len(self.tokenizer) - 1 - sentinel_ids), 0
         )
         sentinel_ids -= mask_indices - start_indices
-
+       
+        assert not (self.clm_token_id in sentinel_ids), 'CLM Token should not be a sentinel id: (%d)' % self.clm_token_id
+        
         return sentinel_ids
 
     def filter_input_ids(self, input_ids, sentinel_ids):
@@ -469,7 +476,7 @@ class Seq2SeqMixDenoisingCollator(transformers.DataCollatorForSeq2Seq):
         # clm batch
         if k > 0:
             # make sure that the tokenizer has the CLM token
-            assert self.clm_token in self.tokenizer.vocab.keys()
+            assert self.clm_token in self.tokenizer.get_vocab().keys()
             # only using
             clm_examples = examples[:k]
             # clm_examples = [self.tokenizer(x)['input_ids'] for x in clm_examples]
@@ -843,7 +850,7 @@ class CLMCollator(transformers.DataCollatorForSeq2Seq):
         # examples is a list of strings of text that are pre-packed using tokenizer eos token
 
         # make sure that the tokenizer has the CLM token
-        assert self.clm_token in self.tokenizer.vocab.keys()
+        assert self.clm_token in self.tokenizer.get_vocab().keys()
 
         # uses whitespace to split, which avoids mid-token splits for text generation
         # assumes documents are packed using tokenizer.eos_token

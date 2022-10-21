@@ -33,6 +33,7 @@ def get_collator(data_args, tokenizer, decoder_start_token_id):
             target_length=target_length,
             pad_token_id=tokenizer.pad_token_id,
             decoder_start_token_id=decoder_start_token_id,
+            clm_token="<extra_id_0>", #Passing CLM token to check that it is not being used as sentinel ID
         )
 
     elif data_args.collator_output_targets == "bart":
