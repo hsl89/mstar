@@ -20,9 +20,10 @@ args:
 - ++data.autotokenizer_path=/mnt/colehawk/bedrock_prod_automodels/tokenizer/
 - ++model.load_method=safe_state_dict 
 - ++model.state_dict_path=/mnt_out/colehawk/easel/20B_t5_prod_candidate/10_11_03_03/last.ckpt/model_fp32_state_dict
+- model.ckpt_path=null
 command:
 - /usr/bin/python3
-image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock_patch_state_dict
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock
 name: chawk-bdrk-20B-p4
 node_num: 204
 node_type: p4d.24xlarge

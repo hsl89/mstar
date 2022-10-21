@@ -7,7 +7,7 @@ CKPT='' #/mnt_out/colehawk/easel/tmp_1/08_01_16_43/epoch\=0-step\=40-validation_
 LIMIT_VAL_BATCHES=50 
 #Usually testing on a g4
 
-python3 pretrain_main.py \
+python3 /usr/local/src/mstar/scripts/bedrock_encoder_decoder/src/pretrain_main.py \
     trainer.max_steps=$MAX_STEPS \
     data.new_datamodule=1 \
     data=drop_2_stage_2_bart \

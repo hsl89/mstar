@@ -15,7 +15,7 @@ args:
 - trainer.val_check_interval=2500
 - callback.save_every_n_train_steps=2500
 - trainer.num_sanity_val_steps=0
-- model.ckpt_path=
+- model.ckpt_path=null
 command:
 - /usr/bin/python3
 image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock

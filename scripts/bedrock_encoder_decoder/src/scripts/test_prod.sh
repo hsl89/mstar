@@ -7,7 +7,7 @@ CKPT='' #/mnt_out/colehawk/easel/tmp_1/08_01_16_43/epoch\=0-step\=40-validation_
 LIMIT_VAL_BATCHES=10 
 #Usually testing on a g4
 
-python3 pretrain_main.py \
+python3 /usr/local/src/mstar/scripts/bedrock_encoder_decoder/src/pretrain_main.py \
     trainer.max_steps=$MAX_STEPS \
     data.new_datamodule=1 \
     data=t5_prod_drop_3 \
@@ -22,9 +22,8 @@ python3 pretrain_main.py \
     optimizer.total_batch_size=8 \
     optimizer.warmup_steps=100 \
     model=1_9B \
-    ++model.load_method=automodel \
-    ++model.automodel_path=/mnt/colehawk/bedrock_prod_automodels/stage_1/1_9B/ \
-    ++data.autotokenizer_path=/mnt/colehawk/bedrock_prod_automodels/tokenizer/ \
+    model.num_layers=2 \
+    model.num_decoder_layers=2 \
     model.positional_embedding=alibi \
     trainer.num_sanity_val_steps=0 \
     trainer.precision=bf16 \

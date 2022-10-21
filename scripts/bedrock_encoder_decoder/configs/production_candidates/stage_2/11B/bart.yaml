@@ -1,25 +1,30 @@
 args:
 - pretrain_main.py
-- run_name=20B_stage_2_t5
+- run_name=11B_stage_2_bart
 - optimizer.base_learning_rate=0.00005
 - model.positional_embedding=alibi
 - trainer.limit_val_batches=100
 - trainer.precision=bf16 
 - trainer.num_sanity_val_steps=0
-- data=drop_4_stage_2_t5
-- trainer.max_steps=150000
+- data=drop_4_stage_2_bart
+- data.clm_max_doc=4
+- optimizer.warmup_steps=3000
+- trainer.max_steps=75000 
 - optimizer.lr_scheduler_type=linear 
-- model=20B
+- model=11B
 - deepspeed_path=config/deepspeed/bf16_zero2d_shard24.json 
+- trainer.num_nodes=66
 - optimizer.micro_batch_size=2
-- trainer.num_nodes=204
+- trainer.limit_val_batches=25
+- trainer.val_check_interval=2500
+- callback.save_every_n_train_steps=2500
 - ++data.autotokenizer_path=/mnt/colehawk/bedrock_prod_automodels/tokenizer/
-- ++model.load_method=safe_state_dict #can remove after 1st saved checkpoint 
-- ++model.state_dict_path=/mnt_out/colehawk/20B_ckpt/model_fp32_state_dict #can remove after 1st saved ckpt
+- ++model.load_method=safe_state_dict 
+- ++model.state_dict_path=/mnt/colehawk/bedrock_prod_automodels/stage_2/11B/alexatm_150B/pytorch_model.bin #continued from 150B tokens 
 - model.ckpt_path=null
 command:
 - /usr/bin/python3
 image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock
-name: chawk-bdrk-20B-t5
-node_num: 204 #divisible by 3, shard24
+name: chawk-bdrk-11B-alexatm
+node_num: 66
 node_type: p4d.24xlarge

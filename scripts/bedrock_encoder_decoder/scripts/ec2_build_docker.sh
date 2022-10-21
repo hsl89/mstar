@@ -8,12 +8,12 @@ echo $DEV
 
 if [ $DEV = '1' ]
 then 
-    dockerfile_path="mstar/scripts/encoder_decoder_training/dev_Dockerfile"
+    dockerfile_path="mstar/scripts/bedrock_encoder_decoder/dev_Dockerfile"
     TAG="${TAG}_dev"
     BASE_CONTAINER=''
 elif [ $DEV = '0' ]
 then
-    dockerfile_path="mstar/scripts/encoder_decoder_training/Dockerfile"
+    dockerfile_path="mstar/scripts/bedrock_encoder_decoder/Dockerfile"
     BASE_CONTAINER="colehawk-${TAG}"
 fi
 echo $TAG
@@ -48,7 +48,7 @@ DOCKER_BUILDKIT=1 sudo docker build -t $TAG -f $dockerfile_path .
 if [ $DEV = '1' ]
 then 
     #cleanup
-    rm -rf  mstar/scripts/encoder_decoder_training/.dotfiles
+    rm -rf  mstar/scripts/bedrock_encoder_decoder/.dotfiles
 fi
 ########################################################################
 # @colehawk-specific install

@@ -4,7 +4,6 @@ args:
 - optimizer.base_learning_rate=0.00025
 - trainer.num_nodes=16
 - optimizer.micro_batch_size=4
-- optimizer.total_batch_size=512
 - model.positional_embedding=alibi
 - deepspeed_path=config/deepspeed/bf16_stage2.json
 - trainer.limit_val_batches=100
@@ -16,7 +15,7 @@ args:
 - ++model.load_method=automodel
 - ++model.automodel_path=/mnt/colehawk/bedrock_prod_automodels/stage_1/1_9B/ 
 - ++data.autotokenizer_path=/mnt/colehawk/bedrock_prod_automodels/tokenizer 
-- model.ckpt_path=/mnt_out/colehawk/easel/stage_2_1_9B_clm/09_28_00_26/epoch=0-step=40000-validation_loss=0.7166_training_loss_step=0.6420.ckpt/
+- model.ckpt_path=null
 command:
 - /usr/bin/python3
 image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock

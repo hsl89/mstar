@@ -1,9 +1,9 @@
 #!/bin/bash
 #Launches docker file but requires region arg
 
-TAG='bedrock_drop_3'
+TAG='bedrock'
 REGIONS=('us-east-1' 'us-east-2' 'us-west-2' 'ap-northeast-2')
-DEVS=('0' '1')
+DEVS=('0') #add '1' to array for dev dockerfile
 NAME='colehawk'
 
 #force clear everything out, rebuild the cache

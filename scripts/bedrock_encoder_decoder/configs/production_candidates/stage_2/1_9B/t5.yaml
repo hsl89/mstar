@@ -16,7 +16,7 @@ args:
 - ++model.load_method=automodel
 - ++model.automodel_path=/mnt/colehawk/bedrock_prod_automodels/stage_1/1_9B/ 
 - ++data.autotokenizer_path=/mnt/colehawk/bedrock_prod_automodels/tokenizer
-- model.ckpt_path=/mnt_out/colehawk/easel/stage_2_1_9B_t5/09_28_16_09/epoch\=0-step\=60000-validation_loss\=1.7837_training_loss_step\=1.7046.ckpt/ 
+- model.ckpt_path=null
 command:
 - /usr/bin/python3
 image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock
