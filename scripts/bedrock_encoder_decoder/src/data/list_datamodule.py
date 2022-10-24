@@ -85,8 +85,15 @@ class HFDataModule(pl.LightningDataModule):
             for x in self.training_dataset_paths
         ]
 
-        # shuffle again to avoid training sequentially
-        train_dataset = datasets.concatenate_datasets(train_datasets).shuffle()
+        if 'sampling_prob' in self.data_args:
+            self.py_logger.info(
+                f"Sampling training datasets with probabilities {self.data_args.sampling_prob}"
+            )
+            train_dataset = datasets.interleave_datasets(
+                train_datasets, probabilities=self.data_args.sampling_prob,
+                seed=self.trainer.current_epoch + self.seed, stopping_strategy="first_exhausted")
+        else:
+            train_dataset = datasets.concatenate_datasets(train_datasets).shuffle()
 
         if self.resume_index is not None:
             # in case we are past the first epoch, need modulo
@@ -140,3 +147,5 @@ class HFDataModule(pl.LightningDataModule):
 
         self.py_logger.info("Finished loading validation data")
         return loader
+
+
