@@ -42,8 +42,8 @@ requirements = [
     "regex",
     "requests",
     "pyarrow>=3",
-    "transformers@git+https://github.com/barry-jin/transformers@8bf3a601a764c4d74e6488be8bc7a9efacaf1ddc",  # transformers that support balanced strategies.  
-    "tokenizers>=0.10.2,<=0.12.1",  # 0.10.1 is buggy; Set upper bound to avoid breaking changes in tokenizers. 
+    "transformers@git+https://github.com/barry-jin/transformers@8bf3a601a764c4d74e6488be8bc7a9efacaf1ddc",  # transformers that support balanced strategies.
+    "tokenizers>=0.10.2,<=0.12.1",  # 0.10.1 is buggy; Set upper bound to avoid breaking changes in tokenizers.
     "accelerate>=0.9.0,<=0.12.0",
     "tensorboard",
     "pandas",
@@ -65,13 +65,7 @@ requirements = [
     "protobuf<=3.20.1",
 ]
 
-tests_require = [
-    "prospector",
-    "pytest",
-    "pytest-mock",
-    "moto",
-    "lorem",
-]
+tests_require = ["prospector", "pytest", "pytest-mock", "moto", "lorem"]
 
 rlfh_require = [
     "transformers==4.18.0",
@@ -89,11 +83,22 @@ rlfh_require = [
 
 pile_require = ["numpy", "pyarrow==8.0.0", "smart-open[s3]", "zstandard==0.18"]
 
+bedrock_encoder_decoder_tests_require = [
+    "hydra-core>=1.2",
+    "transformers>=4.20",
+    "datasets>=2.0.0",
+    "tqdm>=4.64.0",
+    "ninja>=1.10.2",
+    "s3fs>=2022.3.0",
+]
+
 extras = {
     "test": tests_require,
     "rlfh": rlfh_require,
     "pile": pile_require,
+    "bedrock_encoder_decoder_tests": bedrock_encoder_decoder_tests_require,
 }
+
 force_cuda = os.getenv("FORCE_CUDA", "0") == "1"
 extensions = []
 cmdclass = {}
@@ -183,13 +188,7 @@ setup(
     description="M*",
     long_description_content_type="text/markdown",
     # Package info
-    packages=find_packages(
-        where="src",
-        exclude=(
-            "tests",
-            "scripts",
-        ),
-    ),
+    packages=find_packages(where="src", exclude=("tests", "scripts")),
     package_dir={"": "src"},
     package_data={"": [os.path.join("datasets", "dataset_checksums", "*.txt")]},
     zip_safe=True,
@@ -198,6 +197,7 @@ setup(
     tests_require=tests_require,
     rlfh_require=rlfh_require,
     pile_require=pile_require,
+    bedrock_encoder_decoder_tests_require=bedrock_encoder_decoder_tests_require,
     extras_require=extras,
     ext_modules=extensions,
     cmdclass=cmdclass,

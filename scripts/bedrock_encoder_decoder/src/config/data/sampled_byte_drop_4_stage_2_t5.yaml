@@ -1,0 +1,32 @@
+num_workers: 8
+collator_output_targets: mixed_t5_clm
+clm_max_doc: 4
+clm_ratio: 0.5
+max_seq_length: 2048
+clm_max_output_length: 1024
+training_datasets: [
+'/mnt/pretraining-data/byte-tokenizer-data/corrected_drop_1/train1_shard1_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/corrected_drop_1/train1_shard2_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_2/train1_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_2/train2_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_3/train1_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_4/train1_shard1_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_4/train1_shard2_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_4/train2_shard1_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_4/train2_shard2_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_4/train3_packed_chunksize_3100.arrow',
+]
+validation_datasets: [
+'/mnt/pretraining-data/byte-tokenizer-data/corrected_drop_1/val_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_2/val_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_3/val_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_4/val_packed_chunksize_3100.arrow',
+]
+tokenizer: t5-base
+extra_tokenizer_ids: 2000 #these can be useful in downstream tasks
+new_datamodule: 1
+source: 'mix_from_lists'
+resume_idx: null 
+mean_noise_span: 3.0
+mlm_prob: 0.1665
+sampling_prob: [0.026435871354191808, 0.003564128645808191, 0.03896392802546249, 0.0010360719745375134, 0.1, 0.23134975015714637, 0.10114019684553262, 0.2313066338138657, 0.10114058966447959, 0.16506282951897566]
