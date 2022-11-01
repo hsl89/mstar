@@ -20,7 +20,7 @@ args:
 - model.ckpt_path=null
 command:
 - /usr/bin/python3
-image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock-10_24
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock-10-24
 name: chawk-bdrk-20B-t5
 node_num: 204 #divisible by 3, shard24
 node_type: p4d.24xlarge
