@@ -1,6 +1,6 @@
 Please read this first: https://quip-amazon.com/mb4BAGjU3icv/M-EKS-Tutorial
 
-The linked onboarding guide covers the MStar cluster, but this folder provides some additional cluster launch/docker build utilities.
+The linked onboarding guide covers the MStar cluster.
 
 ## Docker build (EC2) 
 
@@ -38,3 +38,26 @@ The dev images add some utilities (vim, tmux, git) in addition to installing req
 # Launching a job
 
 You can launch using the configs in `configs`.
+
+
+# Known Issues
+
+Things that can cause issues that are not easy to diagnose. If you run into an issue, please submit a PR!
+
+## Sharded Context for Model Creation
+
+Currently only the loading method `safe_state_dict` initializes the model in the sharded context. Recommended whenever using Zero-2D/Zero-3.
+
+
+## Deepspeed Sharding+Val Sanity Steps
+
+When using Zero-2D/Zero-3 set `num_val_sanity_steps=0`. Otherwise you will get an error like
+``` 
+RuntimeError: tracing error
+```
+
+## Offline Example Packing
+
+The collators rely on the assumption of offline example packing. They are not guaranteed to handle padding well.
+
+
