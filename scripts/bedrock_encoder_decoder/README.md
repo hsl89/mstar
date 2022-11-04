@@ -39,6 +39,19 @@ The dev images add some utilities (vim, tmux, git) in addition to installing req
 
 You can launch using the configs in `configs`.
 
+# Auto-restart (Temporary feature)
+
+Instead of passing `model.ckpt_path` to resume, you can pass `model.ckpt_path='auto`. This will search for the latest checkpoint in the run directory.
+
+Also, you can filter out keywords by adding to the hydra config. It's necessary to double-escape the "=" for json parsing during mstarx job submission. Normal hydra parsing would require only one escape. It's recommended to 
+```
+#filter out last.ckpt, recommended
+++filter_keywords=['last.ckpt']
+
+#filter out checkpoints containing `last.ckpt` or checkpoints that contain `step=200` or `step=150`
+++filter_keywords=['last.ckpt','step\\=200','step\\=150']
+```
+
 
 # Known Issues
 

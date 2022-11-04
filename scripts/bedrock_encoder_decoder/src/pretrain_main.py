@@ -342,7 +342,12 @@ def main(cfg):
     logger.info("*********** data module set up ***********\n\n")
     data_module.setup()
 
+
     if cfg.model.ckpt_path:
+        if cfg.model.ckpt_path=="auto":
+            import fake_auto_restart
+            cfg.model.ckpt_path = fake_auto_restart.latest_ckpt_wrapper_from_cfg(cfg)
+
         logger.info(f"Resuming from checkpoint to {cfg.model.ckpt_path}")
 
     if not getattr(cfg, "validate_only", False):
