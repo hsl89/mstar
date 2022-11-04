@@ -1,0 +1,35 @@
+num_workers: 8
+collator_output_targets: mixed_t5_clm
+clm_max_doc: 4
+clm_ratio: 0.5
+max_seq_length: 2048
+clm_max_output_length: 1024
+training_datasets: [
+'/mnt/pretraining-data/byte-tokenizer-data/corrected_drop_1/train1_shard1_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/corrected_drop_1/train1_shard2_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_2/train1_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_2/train2_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_3/train1_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_4/train1_shard1_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_4/train1_shard2_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_4/train2_shard1_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_4/train2_shard2_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_4/train3_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/package-10-25-22-v1/train1_shard1_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/package-10-25-22-v1/train1_shard2_packed_chunksize_3100.arrow',
+]
+validation_datasets: [
+'/mnt/pretraining-data/byte-tokenizer-data/corrected_drop_1/val_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_2/val_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_3/val_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/byte-tokenizer-data/drop_4/val_packed_chunksize_3100.arrow',
+'/mnt/pretraining-data/package-10-25-22-v1/val_packed_chunksize_3100.arrow',
+]
+tokenizer: t5-base
+extra_tokenizer_ids: 2000 #these can be useful in downstream tasks
+new_datamodule: 1
+source: 'mix_from_lists'
+resume_idx: null 
+mean_noise_span: 3.0
+mlm_prob: 0.1665
+sampling_prob: [0.026435871354191808, 0.003564128645808191, 0.029222946019096863, 0.000777053980903135, 0.05, 0.15051670492151695, 0.06580205577902123, 0.15048865332468375, 0.06580231134797468, 0.10739027462680345, 0.22373787466040645, 0.12626212533959355]

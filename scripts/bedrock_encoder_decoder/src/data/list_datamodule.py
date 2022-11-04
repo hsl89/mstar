@@ -89,8 +89,42 @@ class HFDataModule(pl.LightningDataModule):
             self.py_logger.info(
                 f"Sampling training datasets with probabilities {self.data_args.sampling_prob}"
             )
+
+            #possible to cause a hang if sampling prob gets too low
+            #TODO @colehawk more investigation
+            EPSILON=0.01
+            if min(self.data_args.sampling_prob)<EPSILON:       
+           
+                new_train_datasets = []
+                new_sampling_probs = []
+                new_filepaths = []
+                
+                for prob, dataset, path in zip(self.data_args.sampling_prob, train_datasets, self.training_dataset_paths):
+                    if prob>EPSILON:
+                        #only keep datasets with enough entries
+                        new_train_datasets.append(dataset)
+                        new_sampling_probs.append(prob)
+                        new_filepaths.append(path)
+
+                #renormalize
+                normalization_constant = sum(new_sampling_probs)
+                new_sampling_probs=[x/normalization_constant for x in new_sampling_probs]
+                train_datasets = new_train_datasets
+                sampling_probs = new_sampling_probs
+
+                self.py_logger.warning(
+                    f"Ratios were too low for some datasets erasing all datasets with prob < {EPSILON}"
+                )
+                self.py_logger.warning(
+                    f"Using probs {sampling_probs} and files {new_filepaths}"
+                )
+                #raise ValueError
+            else:
+                sampling_probs = self.data_args.sampling_prob
+            #remove probs that are too low
+
             train_dataset = datasets.interleave_datasets(
-                train_datasets, probabilities=self.data_args.sampling_prob,
+                train_datasets, probabilities=sampling_probs,
                 seed=self.trainer.current_epoch + self.seed, stopping_strategy="first_exhausted")
         else:
             train_dataset = datasets.concatenate_datasets(train_datasets).shuffle()

@@ -1,0 +1,37 @@
+#each drop has corresponding filepaths and target ratios
+corrected_drop_1:
+    filepaths: [    
+        '/mnt/pretraining-data/byte-tokenizer-data/corrected_drop_1/train1_shard1_packed_chunksize_3100.arrow',
+        '/mnt/pretraining-data/byte-tokenizer-data/corrected_drop_1/train1_shard2_packed_chunksize_3100.arrow',
+    ]
+    target_ratio: 0.03
+
+drop_2:
+    filepaths: [
+        '/mnt/pretraining-data/byte-tokenizer-data/drop_2/train1_packed_chunksize_3100.arrow',
+        '/mnt/pretraining-data/byte-tokenizer-data/drop_2/train2_packed_chunksize_3100.arrow',
+    ]
+    target_ratio: 0.03
+
+drop_3:
+    filepaths: [
+        '/mnt/pretraining-data/byte-tokenizer-data/drop_3/train1_packed_chunksize_3100.arrow',
+    ]
+    target_ratio: 0.05
+
+drop_4:
+    filepaths: [
+        '/mnt/pretraining-data/byte-tokenizer-data/drop_4/train1_shard1_packed_chunksize_3100.arrow',
+        '/mnt/pretraining-data/byte-tokenizer-data/drop_4/train1_shard2_packed_chunksize_3100.arrow',
+        '/mnt/pretraining-data/byte-tokenizer-data/drop_4/train2_shard1_packed_chunksize_3100.arrow',
+        '/mnt/pretraining-data/byte-tokenizer-data/drop_4/train2_shard2_packed_chunksize_3100.arrow',
+        '/mnt/pretraining-data/byte-tokenizer-data/drop_4/train3_packed_chunksize_3100.arrow',
+    ]
+    target_ratio: 0.54
+
+drop_5:
+    filepaths: [
+        '/mnt/pretraining-data/package-10-25-22-v1/train1_shard1_packed_chunksize_3100.arrow',
+        '/mnt/pretraining-data/package-10-25-22-v1/train1_shard2_packed_chunksize_3100.arrow',
+    ]
+    target_ratio: 0.35

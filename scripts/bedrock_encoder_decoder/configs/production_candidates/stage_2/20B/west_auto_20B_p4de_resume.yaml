@@ -1,0 +1,28 @@
+args:
+- pretrain_main.py
+- run_name=patched_20B_stage_2_t5
+- optimizer.warmup_steps=3000
+- optimizer.base_learning_rate=0.0001 
+- trainer.limit_val_batches=50
+- ++model.state_dict_path=/mnt/colehawk/bedrock_patched_state_dict/20B/patched_model.bin 
+- deepspeed_path=config/deepspeed/bf16_zero2d.json #for p4de
+- callback.save_every_n_train_steps=1500 #approximately 3hrs
+- trainer.val_check_interval=1499
+- model.positional_embedding=alibi
+- trainer.precision=bf16 
+- trainer.num_sanity_val_steps=0
+- data=sampled_byte_drop_5_stage_2_t5.yaml
+- trainer.max_steps=5000000 #not expected to hit
+- model=20B
+- optimizer.micro_batch_size=2
+- ++model.load_method=safe_state_dict #leave on until sharded context initialization fixed
+- ++data.autotokenizer_path=/mnt/tokenizer/mstar-t5-sentencepiece-extra_ids_1920-byte_fallback/
+- model.ckpt_path='auto'
+- ++filter_keywords=['last.ckpt','step\\=010','step\\=15000-'] #example double escape for json+hydra, step should not trigger
+command:
+- /usr/bin/python3
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-auto-restart-11-04
+name: test-colehawk-bdrk-20B-stage2-patched
+node_num: 64 #can be any number due to shard8
+node_type: p4de.24xlarge
+fsx: "mstar-new"
