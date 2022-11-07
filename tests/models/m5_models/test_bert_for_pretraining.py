@@ -1,3 +1,5 @@
+import os
+import shutil
 import torch
 import pytest
 import numpy as np
@@ -5,6 +7,12 @@ import numpy as np
 from mstar.models.m5_models import M5BertConfig, M5BertForPreTrainingPreLN
 from mstar.models.m5_models.bert import BertEmbeddings, M5BertModel
 from mstar import AutoModel, AutoTokenizer
+
+mstar_cache_home = os.path.expanduser(
+    os.getenv(
+        "MSTAR_HOME", os.path.join(os.getenv("XDG_CACHE_HOME", "~/.cache"), "mstar")
+    )
+)
 
 BERT_CONFIG_DICT = {
     "vocab_size": 32,
@@ -42,9 +50,16 @@ def test_bert_for_pretraining_pre_ln_output():
 
 
 def test_mstar_bert_model_loading():
-    model = AutoModel.from_pretrained("mstar-bert-5B-bedrock", revision="20221004-300B-MLMonly").to('cpu').to(dtype=torch.bfloat16).eval()
+    key = "mstar-bert-5B-bedrock"
+    revision = "20221004-300B-MLMonly"
+
+    model = AutoModel.from_pretrained(key, revision=revision).to('cpu').to(dtype=torch.bfloat16).eval()
     tokenizer = AutoTokenizer.from_pretrained("roberta-large")
     customer_text = "hello world"
     output = tokenizer(customer_text, max_length=512, truncation=True, return_tensors="pt")
     text_encoding = output['input_ids']
     valid_length = output['attention_mask'].sum(axis=1)
+    
+    #clean up model download to save space
+    path_for_cleanup = os.path.join(mstar_cache_home, "transformers", key,revision)
+    shutil.rmtree(path_for_cleanup)

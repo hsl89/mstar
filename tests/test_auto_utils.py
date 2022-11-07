@@ -1,4 +1,5 @@
 import os
+import shutil
 import torch
 import torch.multiprocessing as mp
 from mstar.AutoTokenizer import from_pretrained as tok_from_pretrained
@@ -178,3 +179,7 @@ def test_load_model_file_with_args():
 
     model = model_from_pretrained(key, revision=revision, softmax_type="torch")
     assert model.config.softmax_type == "torch"
+
+    #clean up model download to save space
+    path_for_cleanup = os.path.join(mstar_cache_home, "transformers", key,revision)
+    shutil.rmtree(path_for_cleanup)
