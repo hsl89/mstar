@@ -1,0 +1,26 @@
+args:
+- pretrain_main.py
+- run_name=continued_20B_stage_2_t5
+- optimizer.warmup_steps=3000
+- optimizer.base_learning_rate=0.00002 
+- trainer.limit_val_batches=50
+- ++model.state_dict_path=/mnt/adirawal/packaged_models/20B_stage_2_embedding_fix/pytorch_model.bin #600B token model
+- deepspeed_path=config/deepspeed/bf16_zero2d_shard24.json #for p4d
+- callback.save_every_n_train_steps=2000 #approximately 3hrs
+- trainer.val_check_interval=1999
+- model.positional_embedding=alibi
+- trainer.precision=bf16 
+- trainer.num_sanity_val_steps=0
+- data=sampled_byte_drop_5_stage_2_t5.yaml
+- trainer.max_steps=5000000 #not expected to hit
+- model=20B
+- optimizer.micro_batch_size=2
+- ++model.load_method=safe_state_dict #leave on until sharded context initialization fixed
+- ++data.autotokenizer_path=/mnt/tokenizer/mstar-t5-sentencepiece-extra_ids_1920-byte_fallback/
+- model.ckpt_path=null
+command:
+- /usr/bin/python3
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-auto-restart-11-04
+name: colehawk-bdrk-20B-stage2
+node_num: 63 #multiple of 3 due to shard24
+node_type: p4d.24xlarge
