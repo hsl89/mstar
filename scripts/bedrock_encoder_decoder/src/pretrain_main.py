@@ -54,17 +54,16 @@ def main(cfg):
     assert "KUBERNETES_SERVICE_HOST" in os.environ, "Only support EKS cluster"
     kubeflow_num_nodes = int(os.environ["NUM_NODES"])
 
-    logging.info(
-        f"Training with {cfg.trainer.num_nodes} nodes "
-        f"micro-batch size {cfg.optimizer.micro_batch_size} "
-        f"and {th.cuda.device_count()} devices per-node"
-    )
     computed_total_batch_size = (
         cfg.trainer.num_nodes * cfg.optimizer.micro_batch_size * th.cuda.device_count()
     )
-    # assert kubeflow_num_nodes==cfg.trainer.num_nodes, f"Specified {cfg.trainer.num_nodes} nodes but have {kubeflow_num_nodes}"
-    # assert cfg.optimizer.total_batch_size==computed_total_batch_size, f"Specified batch size {cfg.optimizer.total_batch_size} but have batch size {computed_total_batch_size}"
-
+    logging.info(
+        f"Training with {cfg.trainer.num_nodes} nodes "
+        f"micro-batch size {cfg.optimizer.micro_batch_size} "
+        f"total batch size {computed_total_batch_size}"
+        f"and {th.cuda.device_count()} devices per-node"
+    )
+    
     # Set seed before initializing model
     pl.utilities.seed.seed_everything(cfg.optimizer.seed)
 
@@ -87,36 +86,17 @@ def main(cfg):
     )
 
     # make sure that model has enough embeddings for the tokenizer
-    if hf_model_config.vocab_size < len(tokenizer):
-        hf_model_config.vocab_size, old_embedding_number = (
-            len(tokenizer),
-            hf_model_config.vocab_size,
-        )
-
-        logger.info(
-            f"Updated model vocab size from {old_embedding_number} "
-            f"to {hf_model_config.vocab_size} to cover vocab size"
-        )
-
-    # make sure embeddings are multiple of 64 for tensor cores
-    if hf_model_config.vocab_size % 64 != 0:
-        hf_model_config.vocab_size, old_embedding_number = (
-            int(np.ceil(hf_model_config.vocab_size / 64)) * 64,
-            hf_model_config.vocab_size,
-        )
-        logger.info(
-            f"Updated model vocab size from {old_embedding_number} "
-            f"to {hf_model_config.vocab_size} to make multiple of 64"
-        )
+    assert hf_model_config.vocab_size >= len(tokenizer), f"Model vocab size {hf_model_config.vocab_size} too small for tokenizer vocab size {len(tokenizer)}"
 
     if cfg.model.fused_scaled_masked_softmax:
-        # the information assigned below is necessary
-        # for the mstar megatron softmax
-        assert cfg.trainer.precision in [16, "bf16"]
-        softmax_precision = (
-            "fp16" if cfg.trainer.precision == 16 else cfg.trainer.precision
-        )
-        setattr(hf_model_config, "softmax_precision", softmax_precision)
+        #make sure trainer/softmax precision match
+        if cfg.trainer.precision==16:
+            #16=fp16 for pytorch lightning
+            assert hf_model_config.softmax_precision=="fp16", f"Trainer precision {cfg.trainer.precision} should match softmax precision {hf_model_config.softmax_precision}"
+        elif cfg.trainer.precision=="bf16":
+            assert hf_model_config.softmax_precision=="bf16", f"Trainer precision {cfg.trainer.precision} should match softmax precision {hf_model_config.softmax_precision}"
+        else:
+            raise ValueError(f"Trainer precision {cfg.trainer.precision} does not match any softmax precision")
 
     # TODO:using custom model class, port to mstarmodel factory
     if getattr(cfg.model, "load_method", None) == "automodel":
@@ -264,15 +244,6 @@ def main(cfg):
         tags={"mode": "Training"},
         do_s3_upload=False,  # safer for 20B
     )
-    """
-    #disabled because s3 upload blocks training
-    # assumes EKS cluster usage
-    mstar_logger = MStarEKSLogger(
-        experiment_name=cfg.experiment_name,
-        run_name=cfg.run_name,
-        tags={"mode": "Training"},
-    )
-    """
 
     # check to avoid config reversion, should remove on cleanup
     assert cfg.data.new_datamodule, "Using new datamodule"
@@ -300,13 +271,6 @@ def main(cfg):
         config=cfg.deepspeed_path,
         remote_device=None,  # Initialize directly on GPUs instead of CPU (ZeRO-3)
     )
-    """
-    progress_bar = MyAWSBatchProgressBar(
-        refresh_rate=cfg.trainer.log_every_n_steps,
-        total_steps=cfg.trainer.max_steps,
-    )
-    """
-    # hotfix
 
     callbacks = [
         pl.callbacks.ModelCheckpoint(

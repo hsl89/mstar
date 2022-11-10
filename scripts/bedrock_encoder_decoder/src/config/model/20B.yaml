@@ -11,7 +11,7 @@ use_bfloat16: false
 tie_word_embeddings: false
 n_positions: 512
 output_past: true
-vocab_size: 32128
+vocab_size: 34176
 d_model: 4096
 d_kv: 256
 d_ff: 16384
@@ -34,3 +34,4 @@ positional_embedding: alibi
 fused_scaled_masked_softmax: true
 fused_attention: true
 softmax_type: mstar_fused
+softmax_precision: "bf16"
