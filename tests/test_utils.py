@@ -5,21 +5,25 @@ import time
 import boto3
 import pytest
 import moto
-
+import numpy as np
 import mstar
 
 
-@pytest.mark.parametrize('max_cpu,jitter,max_time,current_cpu,expected_max_wait', [
-    (90, 0.5, 2, 95, 2.7),  # wait if busy
-    (90, 10, 20, 5, 0.3),   # no wait if not busy
-])
-def test_wait_if_busy(mocker, max_cpu, jitter, max_time,
-                      current_cpu, expected_max_wait):
-    mocker.patch('psutil.cpu_percent', return_value=current_cpu)
+@pytest.mark.parametrize(
+    "max_cpu,jitter,max_time,current_cpu,expected_max_wait",
+    [
+        (90, 0.5, 2, 95, 2.7),  # wait if busy
+        (90, 10, 20, 5, 0.3),  # no wait if not busy
+    ],
+)
+def test_wait_if_busy(
+    mocker, max_cpu, jitter, max_time, current_cpu, expected_max_wait
+):
+    mocker.patch("psutil.cpu_percent", return_value=current_cpu)
 
     @mstar.utils.misc.wait_if_busy(max_cpu, jitter, max_time)
     def func_call(*args, **kwargs):
-        print(f'called with {args}, {kwargs}')
+        print(f"called with {args}, {kwargs}")
 
     tic = time.time()
     func_call(1, b=2)
@@ -28,9 +32,7 @@ def test_wait_if_busy(mocker, max_cpu, jitter, max_time,
     assert toc - tic <= expected_max_wait
 
 
-@pytest.mark.parametrize('env_vars', [
-    {'test_var': 'test_val'}
-])
+@pytest.mark.parametrize("env_vars", [{"test_var": "test_val"}])
 def test_with_env(env_vars):
     @mstar.utils.misc.with_env(env_vars)
     def func_call():
@@ -41,36 +43,39 @@ def test_with_env(env_vars):
         assert k not in os.environ
 
 
-@pytest.mark.parametrize('all_keys,prefix,pattern,expected', [
-    ([], 'abc', 'a', set()),  # no result if not object in bucket
-    (['aa', 'ab', 'ac', 'bc'], 'a', None, {'aa', 'ab', 'ac'}),  # prefix match
-    (['aa', 'ab', 'ac', 'bc'], 'a', '*b', {'ab'})  # prefix and pattern match
-])
+@pytest.mark.parametrize(
+    "all_keys,prefix,pattern,expected",
+    [
+        ([], "abc", "a", set()),  # no result if not object in bucket
+        (["aa", "ab", "ac", "bc"], "a", None, {"aa", "ab", "ac"}),  # prefix match
+        (["aa", "ab", "ac", "bc"], "a", "*b", {"ab"}),  # prefix and pattern match
+    ],
+)
 @moto.mock_s3
-def test_list_matched_s3_objects(mocker, all_keys,
-                                 prefix, pattern, expected):
-    bucket = 'test_bucket'
-    conn = boto3.resource('s3', region_name='us-east-1')
+def test_list_matched_s3_objects(mocker, all_keys, prefix, pattern, expected):
+    bucket = "test_bucket"
+    conn = boto3.resource("s3", region_name="us-east-1")
     conn.create_bucket(Bucket=bucket)
-    client = boto3.client('s3')
+    client = boto3.client("s3")
     for k in all_keys:
-        client.put_object(Bucket=bucket, Key=k, Body='test content.')
+        client.put_object(Bucket=bucket, Key=k, Body="test content.")
 
-    got = set(
-        mstar.utils.misc.list_matched_s3_objects(
-            bucket, prefix, pattern))
+    got = set(mstar.utils.misc.list_matched_s3_objects(bucket, prefix, pattern))
     assert got == expected
 
 
-@pytest.mark.parametrize('num_objs,num_parts,num_expected', [
-    (6, 2, 3),
-    (6, 4, 3),
-    (5, 3, 5),
-    (3, 3, 1),
-    (3, 1, 3),
-    (100000, 4, 25000),
-    (1000000, 250000, 4),
-])
+@pytest.mark.parametrize(
+    "num_objs,num_parts,num_expected",
+    [
+        (6, 2, 3),
+        (6, 4, 3),
+        (5, 3, 5),
+        (3, 3, 1),
+        (3, 1, 3),
+        (100000, 4, 25000),
+        (1000000, 250000, 4),
+    ],
+)
 def test_generate_shards(num_objs, num_parts, num_expected):
     parts = mstar.utils.misc.generate_shards(num_objs, num_parts)
     assert [len(p) for p in parts] == [num_expected] * num_parts
@@ -84,34 +89,36 @@ def test_generate_shards(num_objs, num_parts, num_expected):
 
 
 def test_mstar_logger(mocker):
-    client = mocker.patch('mstar.utils.lightning.MlflowClient')
+    client = mocker.patch("mstar.utils.lightning.MlflowClient")
 
     test_run = mocker.MagicMock()
-    test_run.info.run_id = 'run-id-1'
+    test_run.info.run_id = "run-id-1"
 
     client().get_experiment_by_name = mocker.MagicMock(return_value=None)
-    client().create_experiment = mocker.MagicMock(return_value='experiment-id')
+    client().create_experiment = mocker.MagicMock(return_value="experiment-id")
     client().create_run = mocker.MagicMock(return_value=test_run)
 
     # Create new experiment with first run
     mstar_logger = mstar.utils.lightning.MStarEKSLogger(
-        experiment_name='my-experiment', run_name='first-run')
+        experiment_name="my-experiment", run_name="first-run"
+    )
     mstar_logger.get_client()
-    assert mstar_logger.name == 'experiment-id'
-    assert mstar_logger.run_id == 'run-id-1'
+    assert mstar_logger.name == "experiment-id"
+    assert mstar_logger.run_id == "run-id-1"
 
     test_run2 = mocker.MagicMock()
-    test_run2.info.run_id = 'run-id-2'
+    test_run2.info.run_id = "run-id-2"
 
-    client().create_experiment = mocker.MagicMock(return_value='experiment-id')
+    client().create_experiment = mocker.MagicMock(return_value="experiment-id")
     client().create_run = mocker.MagicMock(return_value=test_run2)
 
     # Create second run in this experiment
     mstar_logger2 = mstar.utils.lightning.MStarEKSLogger(
-        experiment_name='my-experiment', run_name='second-run')
+        experiment_name="my-experiment", run_name="second-run"
+    )
     mstar_logger2.get_client()
-    assert mstar_logger2.name == 'experiment-id'
-    assert mstar_logger2.run_id == 'run-id-2'
+    assert mstar_logger2.name == "experiment-id"
+    assert mstar_logger2.run_id == "run-id-2"
 
     # Test behavior of log_hyperparams
     mstar_logger2.log_hyperparams({"key": 1.0})
@@ -133,49 +140,89 @@ def test_mstar_logger(mocker):
 def test_flops_calculator():
 
     test_decoder_config = {
-        'model_type': 'decoder',
-        'activation_checkpointing': True,
-        'vocab_size': 50257,
-        'hidden_size': 2048,
-        'decoder_num_layers': 24,
-        'decoder_seq_len': 2048,
-        'micro_batchsize': 16,
-        'sec_per_step': 4.4,
+        "model_type": "decoder",
+        "activation_checkpointing": True,
+        "vocab_size": 50257,
+        "hidden_size": 2048,
+        "decoder_num_layers": 24,
+        "decoder_seq_len": 2048,
+        "micro_batchsize": 16,
+        "sec_per_step": 4.4,
     }
 
-    decoder_tflops = 88.56
+    decoder_tflops = 88.56182909
 
     decoder_with_checkpointing_tflops = mstar.utils.flops_calc.compute_tflops_per_gpu(
-        **test_decoder_config)
-    decoder_diff = math.sqrt(
-        (decoder_with_checkpointing_tflops -
-            decoder_tflops)**2)
+        **test_decoder_config
+    )
 
-    assert decoder_diff < 1e-1
+    assert np.allclose(decoder_with_checkpointing_tflops, decoder_tflops)
 
-    test_decoder_config['activation_checkpointing'] = False
+    test_decoder_config["activation_checkpointing"] = False
     decoder_no_checkpointing_tflops = mstar.utils.flops_calc.compute_tflops_per_gpu(
-        **test_decoder_config)
+        **test_decoder_config
+    )
     # no checkpointing requires fewer operations
     assert decoder_no_checkpointing_tflops < decoder_with_checkpointing_tflops
 
+    # encoder-only should match decoder-only
+    # we assume causal masking requires same flops
+    test_encoder_config = {
+        "model_type": "encoder",
+        "activation_checkpointing": True,
+        "vocab_size": 50257,
+        "hidden_size": 2048,
+        "encoder_num_layers": 24,
+        "encoder_seq_len": 2048,
+        "micro_batchsize": 16,
+        "sec_per_step": 4.4,
+    }
+
+    encoder_with_checkpointing_tflops = mstar.utils.flops_calc.compute_tflops_per_gpu(
+        **test_encoder_config
+    )
+
+    assert np.allclose(encoder_with_checkpointing_tflops, decoder_tflops)
+
     test_encoder_decoder_config = {
-        'model_type': 'encoder_decoder',
-        'activation_checkpointing': True,
-        'vocab_size': 50257,
-        'hidden_size': 2048,
-        'decoder_num_layers': 12,
-        'encoder_num_layers': 12,
-        'encoder_seq_len': 2048,
-        'decoder_seq_len': 2048,
-        'micro_batchsize': 16,
-        'use_gated_mlp': True,
-        'sec_per_step': 4.4,
+        "model_type": "encoder_decoder",
+        "activation_checkpointing": True,
+        "vocab_size": 50257,
+        "hidden_size": 2048,
+        "decoder_num_layers": 12,
+        "encoder_num_layers": 12,
+        "encoder_seq_len": 2048,
+        "decoder_seq_len": 2048,
+        "micro_batchsize": 16,
+        "use_gated_mlp": True,
+        "sec_per_step": 4.4,
     }
 
     encoder_decoder_tflops = mstar.utils.flops_calc.compute_tflops_per_gpu(
-        **test_encoder_decoder_config)
+        **test_encoder_decoder_config
+    )
 
     # should exceed decoder-only with same num_layers,hidden size,seq_len
     # due to additional cross-attention
     assert encoder_decoder_tflops > decoder_tflops
+
+    test_long_seq_encoder_decoder_config = {
+        "model_type": "encoder_decoder",
+        "activation_checkpointing": True,
+        "vocab_size": 50257,
+        "hidden_size": 2048,
+        "decoder_num_layers": 12,
+        "encoder_num_layers": 12,
+        "encoder_seq_len": 2048,
+        "decoder_seq_len": 4096,
+        "micro_batchsize": 16,
+        "use_gated_mlp": True,
+        "sec_per_step": 4.4,
+    }
+
+    long_seq_encoder_decoder_tflops = mstar.utils.flops_calc.compute_tflops_per_gpu(
+        **test_long_seq_encoder_decoder_config
+    )
+
+    # longer sequence length should be more tflops in decoder
+    assert long_seq_encoder_decoder_tflops > encoder_decoder_tflops

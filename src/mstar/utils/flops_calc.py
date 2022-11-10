@@ -7,7 +7,7 @@ def attention_block_formula(hidden_size, query_seq_len, key_seq_len):
     Computes FLOPs for attention block, includes linear projection
     For self-attention query_seq_len=key_seq_len
     """
-    c_query = 2 * key_seq_len * (hidden_size**2)
+    c_query = 2 * query_seq_len * (hidden_size**2)
     # k,v must have same seq length
     c_key = 2 * key_seq_len * (hidden_size**2)
     c_val = c_key
@@ -121,41 +121,52 @@ def compute_tflops_per_gpu(
     activation_checkpointing: bool,
     vocab_size: int,
     hidden_size: int,
-    decoder_num_layers: int,
     micro_batchsize: float,
-    decoder_seq_len: int,
+    decoder_seq_len: Optional[int] = 0,
+    decoder_num_layers: Optional[int] = 0,
     encoder_seq_len: Optional[int] = 0,
     encoder_num_layers: Optional[int] = 0,
     use_gated_mlp: Optional[bool] = False,
 ):
     """Compute the TFLOPS of a given model
-    This applies to encoder-decoder and decoder-only models during training with with teacher forcing.
-    This function assumes that gradient checkpointing is used.
+    This applies to encoder-decoder, encoder-only, and decoder-only models 
 
     Parameters
     __________
-    model_type: encoder-decoder or encoder-only
+    model_type: encoder-decoder or encoder-only or decoder-only
     sec_per_step: how many seconds to run one fwd/bwd step
     activation_checkpointing: does training use activation checkpointing?
     vocab_size: number of intput/output embeddings (assumed to be equal)
     hidden_size: size of pre-attention input embeddings, in huggingface config style this is d_model not d_ff
-    decoder_num_layers: number of layers that have input decoder_seq_len input
     micro_batchsize: per-gpu batch size, can be <1 with model parallelism
+    decoder_num_layers: number of layers that have input decoder_seq_len input
     decoder_seq_len: number of inputs to the decoder
-    encoder_seq_len: number of inputs to the encoder, only required for encoder-decoder models
-    encoder_num_layers: number of layers that have input length encoder_seq_len, only necessary for encoder-decoder
+    encoder_seq_len: number of inputs to the encoder
+    encoder_num_layers: number of layers that have input length encoder_seq_len
     use_gated_mlp: If using gated mlp, which adds one matrix multiply
     """
 
-    assert model_type in ["decoder", "encoder_decoder"], "Model type not supported"
+    assert model_type in ["encoder", "decoder", "encoder_decoder"], "Model type not supported"
 
-    if model_type == "decoder":
+    if model_type=="decoder":
+        #assumes equivalent computation despite causal mask
         tflops_per_example = megatron_lm_formula(
             activation_checkpointing=activation_checkpointing,
             vocab_size=vocab_size,
             hidden_size=hidden_size,
             num_layers=decoder_num_layers,
             seq_len=decoder_seq_len,
+            include_softmax=True,
+            use_gated_mlp=use_gated_mlp,
+        )
+    elif model_type=="encoder":
+        #assumes equivalent computation despite causal mask
+        tflops_per_example = megatron_lm_formula(
+            activation_checkpointing=activation_checkpointing,
+            vocab_size=vocab_size,
+            hidden_size=hidden_size,
+            num_layers=encoder_num_layers,
+            seq_len=encoder_seq_len,
             include_softmax=True,
             use_gated_mlp=use_gated_mlp,
         )
