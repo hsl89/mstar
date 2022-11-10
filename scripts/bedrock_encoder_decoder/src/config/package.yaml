@@ -1,0 +1,6 @@
+ckpt_folder: /mnt_out/colehawk/easel/continued_20B_stage_2_t5/11_08_18_14/last.ckpt/
+save_location: null #if unspecified, put in deepspeed folder
+full_state_dict_save_name: full_state_dict.pt #optimizer and model states from deepspeed
+defaults:
+    - _self_
+    - model: 20B #which config we are packaging
