@@ -380,7 +380,7 @@ class BertSelfAttention(nn.Module):
             output_size[2],
             output_size[3],
             dtype=query_layer.dtype,
-            device=torch.cuda.current_device())
+            device=hidden_states.device)
  
         matmul_result.baddbmm_(
             query_layer,  # [b * np, sq, hn]
