@@ -17,10 +17,11 @@ import models
 import mstar.AutoTokenizer
 import mstar.AutoModel
 from mstar.optimizers import FusedAdam
-from lightning import KubeFlowEnvironment, MyMStarEKSLogger, MyAWSBatchProgressBar
+from mstar.utils.lightning import KubeFlowEnvironment, MStarEKSLogger
 import torch as th
 import transformers
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import TQDMProgressBar
 import deepspeed
 
 # local imports
@@ -235,14 +236,14 @@ def main(cfg):
             return model
 
     plugins = []
-    plugins.append(KubeFlowEnvironment(main_port=23456))
+    plugins.append(KubeFlowEnvironment(master_port=23456))
 
     # assumes EKS cluster usage
-    mstar_logger = MyMStarEKSLogger(
+    mstar_logger = MStarEKSLogger(
         experiment_name=cfg.experiment_name,
         run_name=cfg.run_name,
         tags={"mode": "Training"},
-        do_s3_upload=False,  # safer for 20B
+        s3_upload=False,  #slows down large model training
     )
 
     # check to avoid config reversion, should remove on cleanup
@@ -283,12 +284,14 @@ def main(cfg):
             save_last=True,
         ),
         pl.callbacks.LearningRateMonitor(logging_interval="step"),
+        #automatically stop job on nan
         pl.callbacks.EarlyStopping(
             monitor="training_loss_step",  # monitor this logged value
-            patience=1000000,  # don't actually monitor train loss
+            patience=10000000,  # don't actually stop on train 
             strict=True,  # monitored value must exist
-            check_finite=True,  # forces monitored value to be finie
+            check_finite=True,  # forces monitored value to be finite
         ),
+        TQDMProgressBar(refresh_rate=cfg.trainer.log_every_n_steps),
     ]
 
     trainer = pl.Trainer(

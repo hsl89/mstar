@@ -8,7 +8,7 @@ gpus: -1
 gradient_clip_val: 1.0
 limit_train_batches: null
 limit_val_batches: null
-log_every_n_steps: 50
+log_every_n_steps: 10
 log_gpu_memory: null
 max_epochs: null
 max_steps: 100000

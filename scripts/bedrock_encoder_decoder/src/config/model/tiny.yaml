@@ -28,3 +28,4 @@ positional_embedding: alibi
 fused_scaled_masked_softmax: true
 fused_attention: true
 softmax_type: mstar_fused
+softmax_precision: "bf16"
