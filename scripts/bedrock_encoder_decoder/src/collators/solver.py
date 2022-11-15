@@ -14,10 +14,6 @@ logger = logging.getLogger(__name__)
 
 def get_collator(data_args, tokenizer, decoder_start_token_id):
 
-    if data_args.source == "mtl":
-        # don't need collator for existing MLT pipeline
-        return None
-
     if data_args.collator_output_targets == "t5":
         expanded_inputs_length, target_length = compute_input_and_target_lengths(
             inputs_length=data_args.max_seq_length,

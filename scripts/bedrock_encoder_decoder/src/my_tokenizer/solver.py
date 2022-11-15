@@ -10,11 +10,6 @@ logger = logging.getLogger(__name__)
 
 def get_tokenizer(data_args):
 
-    if data_args.source == "mtl":
-        # don't create new tokenizer when doing mtl
-        # may be ok to break this later
-        return transformers.AutoTokenizer.from_pretrained(data_args.tokenizer_path)
-
     # add extra tokens for easier downstream use
     sentinel_ids_needed = data_args.extra_tokenizer_ids
 

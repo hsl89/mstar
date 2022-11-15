@@ -246,9 +246,6 @@ def main(cfg):
         s3_upload=False,  #slows down large model training
     )
 
-    # check to avoid config reversion, should remove on cleanup
-    assert cfg.data.new_datamodule, "Using new datamodule"
-
     model_module = models.modelmodule.PlModel(
         config=hf_model_config,
         full_experiment_config=cfg,  # pass full cfg over for easier logging
