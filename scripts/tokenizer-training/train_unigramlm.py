@@ -8,7 +8,7 @@ parser.add_argument("--vocab_size", "-v", type=int, required=True)
 parser.add_argument("--num_examples", "-n", type=int, required=False, default=10000000)
 parser.add_argument("--byte_fallback", "-b", action="store_true")
 parser.add_argument("--max_sentence_length", "-msl", type=int, required=False, default=4096)
-parser.add_argument("--data", "-d", type=str, required=True)
+parser.add_argument("--data", "-d", type=str, nargs="+", required=True)
 parser.add_argument("--name_suffix", "-s", type=str, required=False, default='')
 parser.add_argument("--output_folder", "-o", type=str, required=False, default='output')
 parser.add_argument("--num_threads", "-th", type=int, required=False, default=128)
@@ -16,7 +16,7 @@ parser.add_argument("--num_threads", "-th", type=int, required=False, default=12
 
 args = parser.parse_args()
 
-data = datasets.arrow_dataset.Dataset.from_file(args.data).shuffle(seed=42)
+data = datasets.concatenate_datasets([datasets.arrow_dataset.Dataset.from_file(d) for d in args.data]).shuffle(seed=42).select(range(args.num_examples*2))
 
 def dataset_iterator(dataset):
     for i in range(len(dataset)):
