@@ -1,4 +1,5 @@
 ckpt_path: null
+state_dict_path: null
 use_hf_constructor: false
 return_dict: true
 output_hidden_states: false
@@ -29,3 +30,4 @@ fused_scaled_masked_softmax: true
 fused_attention: true
 softmax_type: mstar_fused
 softmax_precision: "bf16"
+gradient_checkpointing: true

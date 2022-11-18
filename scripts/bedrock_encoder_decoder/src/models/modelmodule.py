@@ -13,47 +13,6 @@ from transformers.trainer_pt_utils import get_parameter_names
 import math
 from torch.optim.lr_scheduler import LambdaLR
 
-
-def get_hotfix_inverse_sqrt_schedule(optimizer, warmup_steps, last_epoch=-1):
-    """Inverse square root learning rate schedule with linear warmup from 0
-	lr = min(step_num*max_lr/warmup_steps, max_lr/sqrt(current_step)
-
-    Args:
-        optimizer (:class:`~torch.optim.Optimizer`):
-            The optimizer for which to schedule the learning rate.
-            The total number of training steps.
-        warmup_steps (:obj:`int`):
-            The number of steps for the warmup phase.
-        last_epoch (:obj:`int`, `optional`, defaults to -1):
-            The index of the last epoch when resuming training.
-
-    Return:
-        :obj:`torch.optim.lr_scheduler.LambdaLR` with the appropriate schedule.
-
-    """
-
-    def lr_lambda(global_step: int):
-        # hardcodes from 20B bedrock
-        previous_max = 0.0001
-        new_max = 0.00006
-        previous_step = 120000
-        new_mult = 2.0
-        new_warmup_steps = 2000
-        old_warmup_steps = 10000
-
-        if global_step <= new_warmup_steps:
-            # linear warmup to here
-            return (global_step / new_warmup_steps) * (new_max / previous_max)
-        else:
-            return (
-                new_mult
-                * math.sqrt(old_warmup_steps)
-                / math.sqrt(previous_step + global_step)
-            )
-
-    return LambdaLR(optimizer, lr_lambda, last_epoch)
-
-
 def get_inverse_sqrt_schedule(optimizer, warmup_steps, last_epoch=-1):
     """Inverse square root learning rate schedule with linear warmup from 0
 	lr = min(step_num*max_lr/warmup_steps, max_lr/sqrt(current_step)
@@ -124,20 +83,9 @@ class PlModel(pl.LightningModule):
 
     def setup(self, stage):
 
-        if (
-            getattr(self.full_experiment_config.model, "load_method", None)
-            == "safe_state_dict"
-        ):
-            # pass trainer as arg, required for state dict logic
-            self.py_logger.info(
-                f"Loading from model weights from state dict via zero-3 strategy"
-            )
-            self.model = self.model_init_fn(self.trainer)
-
-        else:
-            self.model = self.model_init_fn()
+        self.model = self.model_init_fn()
         # always use gradient checkpointing
-        self.model.gradient_checkpointing_enable()
+        #self.model.gradient_checkpointing_enable()
 
     def on_train_start(self):
 
@@ -292,10 +240,7 @@ class PlModel(pl.LightningModule):
             scheduler = get_inverse_sqrt_schedule(
                 optimizer, self.optimizer_cfg.warmup_steps, last_epoch=-1
             )
-        elif self.optimizer_cfg.lr_scheduler_type == "hotfix_inverse_square_root":
-            scheduler = get_hotfix_inverse_sqrt_schedule(
-                optimizer, self.optimizer_cfg.warmup_steps, last_epoch=-1
-            )
+
         elif self.optimizer_cfg.lr_scheduler_type == "linear":
             scheduler = transformers.optimization.get_scheduler(
                 self.optimizer_cfg.lr_scheduler_type,

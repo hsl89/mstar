@@ -21,6 +21,7 @@ layer_norm_epsilon: 0.000001
 feed_forward_proj: gated-gelu
 dense_act_fn: gelu
 use_cache: false
+gradient_checkpointing: true
 use_fused_attention: true
 decoder_start_token_id: 0
 initializer_factor: 0.5

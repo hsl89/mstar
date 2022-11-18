@@ -1,4 +1,5 @@
 ckpt_path: null
+state_dict_path: null
 gradient_checkpointing: true
 tokenizer_path: null
 use_hf_constructor: false
