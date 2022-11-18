@@ -64,21 +64,17 @@ class PlModel(pl.LightningModule):
 
     def __init__(
         self,
-        config,
-        full_experiment_config,
+        full_experiment_config, #to log parameters
         model_init_fn,
         py_logger,
         optimizer_cfg,
         scheduler_mult_factor=None,
     ):
         super().__init__()
-        self.config = config
-        self.model_init_fn = model_init_fn
         self.full_experiment_config = full_experiment_config
+        self.model_init_fn = model_init_fn
         self.py_logger = py_logger
         self.optimizer_cfg = optimizer_cfg
-
-        # self.save_hyperparameters(ignore=["model"])
         self.scheduler_mult_factor = scheduler_mult_factor
 
     def setup(self, stage):
@@ -196,11 +192,9 @@ class PlModel(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-
-        # save to log config here because it takes place after setup/distributed launch
-        # logging before setup logs on all processes and causes duplicated
+        
+        #log here since it occurs after ddp launches
         self.logger.log_hyperparams(self.full_experiment_config)
-        # full_experiment_config)
 
         assert self.trainer.max_steps
         # Infer learning rate

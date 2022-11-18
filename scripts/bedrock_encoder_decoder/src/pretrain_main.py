@@ -8,18 +8,10 @@ import yaml
 import logging
 import os
 import sys
-import json
-from typing import Optional
-from dataclasses import dataclass, field, asdict
-import numpy as np
 import mstar.models.t5
-import mstar.AutoTokenizer
-from mstar.optimizers import FusedAdam
 from mstar.utils.lightning import KubeFlowEnvironment, MStarEKSLogger
 import torch as th
-import transformers
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import TQDMProgressBar
 import deepspeed
 
 # local imports
@@ -91,9 +83,7 @@ def main(cfg):
         else:
             raise ValueError(f"Trainer precision {cfg.trainer.precision} does not match any softmax precision")
 
-
-    plugins = []
-    plugins.append(KubeFlowEnvironment(master_port=23456))
+    plugins = [KubeFlowEnvironment(master_port=23456)]
 
     # assumes EKS cluster usage
     mstar_logger = MStarEKSLogger(
@@ -105,9 +95,6 @@ def main(cfg):
 
     save_dir_path = utils.logging.get_save_dir(cfg)
 
-    if cfg.trainer.gpus == -1:
-        cfg.trainer.gpus = th.cuda.device_count()
-
     # strategy determines distributed training
     # required to use deepspeed config json
     # used for optimized Zero-2D internal version
@@ -116,26 +103,13 @@ def main(cfg):
         remote_device=None,  # Initialize directly on GPUs instead of CPU (ZeRO-3)
     )
 
+    #TODO(colehawk) move to hydra instantiation of list as well
     callbacks = [
-        pl.callbacks.ModelCheckpoint(
-            every_n_train_steps=cfg.callback.save_every_n_train_steps,
-            save_top_k=cfg.callback.save_top_k,
-            dirpath=save_dir_path,
-            monitor="validation_loss",
-            mode="min",
-            filename="{epoch}-{step}-{validation_loss:.2f}",
-            save_last=True,
-        ),
-        pl.callbacks.LearningRateMonitor(logging_interval="step"),
-        #automatically stop job on nan
-        pl.callbacks.EarlyStopping(
-            monitor="training_loss_step",  # monitor this logged value
-            patience=10000000,  # don't actually stop on train 
-            strict=True,  # monitored value must exist
-            check_finite=True,  # forces monitored value to be finite
-        ),
-        TQDMProgressBar(refresh_rate=cfg.trainer.log_every_n_steps),
-    ]
+        hydra.utils.instantiate(cfg.lightning.callbacks.checkpoint,dirpath=save_dir_path),
+        hydra.utils.instantiate(cfg.lightning.callbacks.lr_monitor),
+        hydra.utils.instantiate(cfg.lightning.callbacks.early_stopping),
+        hydra.utils.instantiate(cfg.lightning.callbacks.progress_bar)
+    ] 
 
     trainer = pl.Trainer(
         **cfg.trainer,
@@ -145,7 +119,13 @@ def main(cfg):
         strategy=strategy,
         logger=mstar_logger,
     )
-    
+   
+    from omegaconf import OmegaConf
+    cfg_as_dict = OmegaConf.to_container(cfg)
+    #cfg["recursive"]=False
+    #print(cfg_as_dict)
+    #raise ValueError
+ 
     assert len(list(filter(None,[cfg.model.state_dict_path,cfg.model.ckpt_path])))<=1, "Resume from either cfg.model.state_dict_path or cfg.model.ckpt_path not both"
 
     model_init_fn = lambda : models.utils.load_model(
@@ -155,17 +135,32 @@ def main(cfg):
         state_dict_path=cfg.model.state_dict_path,
     )
 
-    model_module = models.modelmodule.PlModel(
-        config=hf_model_config,
-        full_experiment_config=cfg,  # pass full cfg over for easier logging
-        model_init_fn=model_init_fn,
-        py_logger=logger,
-        optimizer_cfg=cfg.optimizer,
-        scheduler_mult_factor=cfg.optimizer.scheduler_mult_factor,  # used to resume from a checkpoint with an adjusted scheduler, will reload scheduler otherwise
+    #TODO(colehawk) full experiment config
+    #full_experiment_config=cfg,  # pass full cfg over for easier logging
+
+    model_module = hydra.utils.instantiate(
+            cfg.lightning.model_module,
+            _recursive_=False, #otherwise hydra tries to instantiate the full config
+            full_experiment_config=cfg,
+            model_init_fn=model_init_fn,
+            py_logger=logger,
+            optimizer_cfg=cfg.optimizer,
+            scheduler_mult_factor=cfg.optimizer.scheduler_mult_factor,  # used to resume from a checkpoint with an adjusted scheduler, will reload scheduler otherwise
+        )
+
+    #since we shard in the datamodule, don't let PTL re-shard
+    assert cfg.trainer.replace_sampler_ddp is False
+    data_module = hydra.utils.instantiate(
+        cfg.lightning.data_module,
+        tokenizer=tokenizer,
+        training_datasets=cfg.data.training_datasets,
+        validation_datasets=cfg.data.validation_datasets,
+        seed=cfg.optimizer.seed,
+        micro_batch_size=cfg.optimizer.micro_batch_size,
+        data_args=cfg.data,
+        data_collator=collator,
+        py_logger=logger
     )
-
-    data_module = data.solver.get_datamodule(tokenizer, cfg, collator, logger)
-
 
     # saving structure assumes deepspeed strategy
     assert isinstance(trainer.strategy, pl.strategies.DeepSpeedStrategy)

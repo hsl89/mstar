@@ -4,8 +4,8 @@ defaults:
     - optimizer: base
     - data: t5_prod
     - model: base
-    - callback: base
     - tokenizer: base
+    - lightning: base
 
 run_name: 1_9B
 experiment_name: easel-pretraining
