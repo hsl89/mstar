@@ -24,7 +24,6 @@ import deepspeed
 
 # local imports
 import models
-import my_tokenizer
 import data
 import collators
 import utils
@@ -35,6 +34,7 @@ def main(cfg):
     """
     Launch pretraining
     """
+
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
@@ -66,13 +66,7 @@ def main(cfg):
     # Set seed before initializing model
     pl.utilities.seed.seed_everything(cfg.optimizer.seed)
 
-    if hasattr(cfg.data, "autotokenizer_path"):
-        logger.info(
-            f"Loading autotokenizer from specified tokenzier path {cfg.data.autotokenizer_path}"
-        )
-        tokenizer = mstar.AutoTokenizer.from_pretrained(cfg.data.autotokenizer_path)
-    else:
-        tokenizer = my_tokenizer.solver.get_tokenizer(data_args=cfg.data)
+    tokenizer = hydra.utils.call(cfg.tokenizer)
 
     # set up huggingface-style model config
     # uses custom config class for extra args

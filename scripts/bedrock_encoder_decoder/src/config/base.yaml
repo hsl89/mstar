@@ -5,6 +5,7 @@ defaults:
     - data: t5_prod
     - model: base
     - callback: base
+    - tokenizer: base
 
 run_name: 1_9B
 experiment_name: easel-pretraining
