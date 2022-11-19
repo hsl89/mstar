@@ -7,6 +7,8 @@ import pytest
 import moto
 import numpy as np
 import mstar
+from utils.boring_model import BoringModel
+from pytorch_lightning import Trainer
 
 
 @pytest.mark.parametrize(
@@ -226,3 +228,18 @@ def test_flops_calculator():
 
     # longer sequence length should be more tflops in decoder
     assert long_seq_encoder_decoder_tflops > encoder_decoder_tflops
+
+
+def test_mstar_progress_bar(tmpdir):
+    progressbar = mstar.utils.lightning.AWSBatchProgressBar()
+    model = BoringModel()
+    trainer = Trainer(
+        default_root_dir=tmpdir,
+        num_sanity_val_steps=0,
+        limit_train_batches=2,
+        max_epochs=2,
+        callbacks=progressbar,
+    )
+    pbar = trainer.progress_bar_callback
+    trainer.fit(model)
+    assert pbar.train_batch_idx == 2

@@ -121,9 +121,9 @@ class AWSBatchProgressBar(ProgressBarBase):
         self._last_batch_end_logged = time.time()
 
     def on_train_batch_end(  # pylint: disable=unused-argument, arguments-renamed
-        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
+        self, trainer, pl_module, outputs, batch, batch_idx
     ):
-        self.train_batch_idx += 1
+        super().on_train_batch_end(trainer, pl_module, outputs, batch, batch_idx)
         if self.train_batch_idx % self._refresh_rate == 0:
             it_per_seconds = self._refresh_rate / (
                 time.time() - self._last_batch_end_logged

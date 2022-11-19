@@ -1,0 +1,1 @@
+from .boring_model import BoringModel, RandomDataset
