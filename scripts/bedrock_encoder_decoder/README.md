@@ -18,6 +18,10 @@ bash scripts/docker.sh $REGION $TAG
 ```
 to build the `Dockerfile` and push a docker image tagged `$(whoami)-$TAG` to the `mstar-eks` ECR in region `REGION`.
 
+## Sample launch command
+
+`bash scripts/sample_run.sh`
+
 ## Additional Info (Can Skip)
 
 The docker scripts copy over the current directory. Also, they pull from the mstar master branch docker image in the Elastic Container Repository `mstar-gitlab:master` in region `us-east-2` (of the gluonnlp account). This is only up-to-date on the first pull. After that your local machine will cache the image, so you can run 

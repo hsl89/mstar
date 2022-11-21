@@ -2,12 +2,12 @@ defaults:
     - _self_
     - trainer: base
     - optimizer: base
-    - data: t5_prod
-    - model: base
+    - data: stage_1_consolidated_11_07
+    - model: tiny
     - tokenizer: base
     - lightning: base
 
-run_name: 1_9B
-experiment_name: easel-pretraining
-deepspeed_path: config/deepspeed/stage2.json #can use zero2d if multimodel required
-validate_only: 0 #skip all training
+run_name: tmp 
+experiment_name: tmp
+deepspeed_path: config/deepspeed/bf16_zero2d.json
+validate_only: 0 #skip all training, validate from checkpoint

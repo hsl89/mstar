@@ -3,7 +3,6 @@ adam_beta2: 0.98
 adam_epsilon: 1.0e-08
 adam_w_mode: true
 base_learning_rate: 0.0001
-total_batch_size: 512
 micro_batch_size: 8
 lr_scheduler_type: inverse_square_root
 optimizer: fusedadam

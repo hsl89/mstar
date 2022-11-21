@@ -1,4 +1,5 @@
 ckpt_path: null
+state_dict_path: null
 use_hf_constructor: false
 return_dict: true
 output_hidden_states: false
