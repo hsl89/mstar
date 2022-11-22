@@ -7,8 +7,6 @@ COPY mstar/scripts/bedrock_encoder_decoder/src/requirements.txt  /usr/local/src/
 #install requirements
 RUN pip install -r /usr/local/src/mstar/scripts/bedrock_encoder_decoder/src/requirements.txt
 
-RUN pip install -U pytorch-lightning@git+https://github.com/barry-jin/pytorch-lightning@release/1.6.5#egg=pytorch-lightning
-
 #copy over code in a later layer for faster rebuild
 COPY mstar/ /usr/local/src/mstar/
 

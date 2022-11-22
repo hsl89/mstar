@@ -4,11 +4,11 @@ The linked onboarding guide covers the MStar cluster.
 
 ## Docker build (EC2) 
 
-EC2 is faster for both docker builds and pushes (higher bandwith than local wifi). You can (1) install docker on your EC2 dev machine (2) authenticate using the gluonnlp temporary credentials, and then (3) change `NAME` and `TAG` in `scripts/ec2_all_region_docker` and finally (4) use 
+EC2 is faster for both docker builds and pushes (higher bandwith than local wifi). You can (1) install docker on your EC2 dev machine (2) authenticate using the gluonnlp temporary credentials, and then (3) use
 ```
-bash scripts/ec2_all_region_docker.sh
+bash scripts/ec2_all_region_docker.sh $USER $CONTAINER_DESCRIPTION
 ```
-to build the dev and non-dev dockerfiles and push to all regions. See `scripts/ec2_all_region_docker` for more information. 
+to build docker images and push to all regions. See `scripts/ec2_all_region_docker.sh` for more information. The actual docker build is performed in `scripts/ec2_build_docker.sh` and takes places from the parent directory of `mstar`. 
 
 ## Docker build (Local)
 
@@ -31,13 +31,6 @@ docker system prune -a
 to clear out your local cache. Then rebuilding the container will put you up-to-date with the MStar master branch. Otherwise your build will always use the local cache and it will be out-of-date.
 
 Note that this is different than the gitlab setup described in the EKS tutorial linked above. 
-
-
-# Dev workspace setup
-This assumes that you will create a dev workspace on the MStar EKS cluster.
-
-This assumes you have already created a development dockerfile. You can also build an image from the `dev_Dockerfile` by editing `scripts/ec2_all_region_docker.sh` so that `DEVS=('0' '1')`. Adding the `1` flag also builds from the `dev_Dockerfile` and pushes dev images in each region.
-The dev images add some utilities (vim, tmux, git) in addition to installing requirements and copying over the code.
 
 # Launching a job
 

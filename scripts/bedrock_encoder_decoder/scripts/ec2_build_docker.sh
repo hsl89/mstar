@@ -1,58 +1,22 @@
 #!/bin/bash
-#Launches docker file but requires region arg
+#Launches docker build
+#Moves to the parent directory of mstar for the build command
+
+DOCKERFILE_PATH="mstar/scripts/bedrock_encoder_decoder/Dockerfile"
 
 TAG=$1
-DEV=${2-"0"}
 
-echo $DEV
-
-if [ $DEV = '1' ]
-then 
-    dockerfile_path="mstar/scripts/bedrock_encoder_decoder/dev_Dockerfile"
-    TAG="${TAG}_dev"
-    BASE_CONTAINER=''
-elif [ $DEV = '0' ]
-then
-    dockerfile_path="mstar/scripts/bedrock_encoder_decoder/Dockerfile"
-    BASE_CONTAINER="colehawk-${TAG}"
-fi
 echo $TAG
-
-echo $dockerfile_path
+echo $DOCKERFILE_PATH
 
 #Set region for first pull
+#assumes build from us-east-2 master container
 aws ecr get-login-password --region us-east-2 | sudo docker login --username AWS --password-stdin 747303060528.dkr.ecr.us-east-2.amazonaws.com
 
-########################################################################
-# @colehawk-specific install
-########################################################################
-if [ $DEV = '1' ]
-then 
-	git clone https://github.com/colehawkins/.dotfiles.git
-	cd .dotfiles
-	git checkout docker
-	cd ..
-fi
-########################################################################
-# @colehawk-specific install
-########################################################################
-
-#build docker file from parent directory
+#build docker file from parent directory of mstar
 cd ../../..
 echo $TAG
-DOCKER_BUILDKIT=1 sudo docker build -t $TAG -f $dockerfile_path .
-
-########################################################################
-# @colehawk-specific install
-########################################################################
-if [ $DEV = '1' ]
-then 
-    #cleanup
-    rm -rf  mstar/scripts/bedrock_encoder_decoder/.dotfiles
-fi
-########################################################################
-# @colehawk-specific install
-########################################################################
+DOCKER_BUILDKIT=1 sudo docker build -t $TAG -f $DOCKERFILE_PATH .
 
 #to avoid credential overlap for different ecr repos
 sudo docker logout
