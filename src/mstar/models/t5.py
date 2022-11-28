@@ -569,7 +569,7 @@ class FusedT5Attention(nn.Module):
             output_size = (batch_size, num_heads, query_length, key_length)
 
             if not self.scale_mask_softmax.is_kernel_available(*output_size):
-                logger.warning(
+                warnings.warn(
                     "Selected fused softmax but it is not available for given output size\n"
                     "Falling back to slower torch softmax"
                 )
