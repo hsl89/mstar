@@ -1,5 +1,6 @@
 from transformers import T5Tokenizer
 from typing import Optional, Dict, Any, List
+import unicodedata
 
 class SentencepieceTokenizer(T5Tokenizer):
     def __init__(
@@ -65,3 +66,10 @@ class SentencepieceTokenizer(T5Tokenizer):
             alpha=self.alpha, 
             nbest_size=self.sampling_size
             )
+
+
+class NFDSentencepieceTokenizer(SentencepieceTokenizer):
+    def _tokenize(self, text: str) -> List[str]:
+        """Take as input a string, normalizes it according to NFD, and return a list of strings (tokens) for words/sub-words. Subword sampling is used with the parameters specified during initiatlization if enabled."""
+        normalized_text = unicodedata.normalize('NFD', text)
+        return super()._tokenize(normalized_text)
