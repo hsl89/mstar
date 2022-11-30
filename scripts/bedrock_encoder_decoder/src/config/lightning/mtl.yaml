@@ -1,0 +1,6 @@
+defaults:
+    - _self_
+    - model_module: mtl 
+    - data_module: mtl
+    - callbacks: mtl
+

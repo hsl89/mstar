@@ -1,0 +1,13 @@
+defaults:
+    - _self_
+    - trainer: mtl
+    - optimizer: mtl
+    - data: mtl
+    - model: base
+    - tokenizer: base
+    - lightning: mtl 
+
+run_name: 1_9B
+experiment_name: easel_mix_pile_p3 
+deepspeed_path: config/deepspeed/bf16_zero2d.json #can use zero2d if multimodel required
+validate_only: 0 #skip all training

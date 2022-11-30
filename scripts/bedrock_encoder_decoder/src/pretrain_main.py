@@ -134,33 +134,85 @@ def main(cfg):
         model_config=hf_model_config,
         state_dict_path=cfg.model.state_dict_path,
     )
-
+    
     #TODO(colehawk) full experiment config
     #full_experiment_config=cfg,  # pass full cfg over for easier logging
 
-    model_module = hydra.utils.instantiate(
-            cfg.lightning.model_module,
-            _recursive_=False, #otherwise hydra tries to instantiate the full config
-            full_experiment_config=cfg,
-            model_init_fn=model_init_fn,
-            py_logger=logger,
-            optimizer_cfg=cfg.optimizer,
-            scheduler_mult_factor=cfg.optimizer.scheduler_mult_factor,  # used to resume from a checkpoint with an adjusted scheduler, will reload scheduler otherwise
+    if cfg.data.source=="mtl":
+
+        VAL_LOSS_NAMES = ['labeled_val_loss', 'validation_loss']
+        assert (cfg.optimizer.labeled_micro_batch_size+cfg.optimizer.unlabeled_micro_batch_size == cfg.optimizer.micro_batch_size), 'Sum of unlabeled and labeled micro-batch-size should equal to the total micro-batch-size'
+        #######****SETUP MTL DATA-MODULE******##################
+        #since we shard in the datamodule, don't let PTL re-shard
+        assert cfg.trainer.replace_sampler_ddp is False
+
+        #Unlabeled data module
+        if cfg.optimizer.unlabeled_micro_batch_size > 0:
+                unlabeled_data_module = data.datamodule.HFDataModule(
+                tokenizer=tokenizer,
+                training_datasets=cfg.data.training_datasets,
+                validation_datasets=cfg.data.validation_datasets,
+                seed=cfg.optimizer.seed,
+                micro_batch_size=cfg.optimizer.unlabeled_micro_batch_size,
+                data_args=cfg.data,
+                data_collator=collator,
+                py_logger=logger,
+            )
+        else:
+            unlabeled_data_module = None
+ 
+        data_module = hydra.utils.instantiate(
+            cfg.lightning.data_module,
+            tokenizer=tokenizer,
+            labeled_batch=cfg.optimizer.labeled_micro_batch_size,
+            unlabeled_batch=cfg.optimizer.unlabeled_micro_batch_size,
+            max_seq_length=cfg.data.max_seq_length,
+            labeled_max_ip_seq_len=cfg.data.max_seq_length,
+            labeled_max_op_seq_len=cfg.data.max_output_length,
+            labeled_data_path=cfg.data.labeled_data_path,
+            unlabeled_data_module=unlabeled_data_module,
+            py_logger=logger
         )
 
-    #since we shard in the datamodule, don't let PTL re-shard
-    assert cfg.trainer.replace_sampler_ddp is False
-    data_module = hydra.utils.instantiate(
-        cfg.lightning.data_module,
-        tokenizer=tokenizer,
-        training_datasets=cfg.data.training_datasets,
-        validation_datasets=cfg.data.validation_datasets,
-        seed=cfg.optimizer.seed,
-        micro_batch_size=cfg.optimizer.micro_batch_size,
-        data_args=cfg.data,
-        data_collator=collator,
-        py_logger=logger
-    )
+        model_module = hydra.utils.instantiate(
+                cfg.lightning.model_module,
+                _recursive_=False, #otherwise hydra tries to instantiate the full config
+                full_experiment_config=cfg,
+                model_init_fn=model_init_fn,
+                py_logger=logger,
+                optimizer_cfg=cfg.optimizer,
+                scheduler_mult_factor=cfg.optimizer.scheduler_mult_factor,  # used to resume from a checkpoint with an adjusted scheduler, will reload scheduler otherwise
+                unlabeled_batch_size=cfg.optimizer.unlabeled_micro_batch_size,
+                labeled_batch_size=cfg.optimizer.labeled_micro_batch_size,
+                tokenizer=tokenizer,
+                val_loss_names=VAL_LOSS_NAMES
+            )
+
+
+    else:
+        model_module = hydra.utils.instantiate(
+                cfg.lightning.model_module,
+                _recursive_=False, #otherwise hydra tries to instantiate the full config
+                full_experiment_config=cfg,
+                model_init_fn=model_init_fn,
+                py_logger=logger,
+                optimizer_cfg=cfg.optimizer,
+                scheduler_mult_factor=cfg.optimizer.scheduler_mult_factor,  # used to resume from a checkpoint with an adjusted scheduler, will reload scheduler otherwise
+            )
+
+        #since we shard in the datamodule, don't let PTL re-shard
+        assert cfg.trainer.replace_sampler_ddp is False
+        data_module = hydra.utils.instantiate(
+            cfg.lightning.data_module,
+            tokenizer=tokenizer,
+            training_datasets=cfg.data.training_datasets,
+            validation_datasets=cfg.data.validation_datasets,
+            seed=cfg.optimizer.seed,
+            micro_batch_size=cfg.optimizer.micro_batch_size,
+            data_args=cfg.data,
+            data_collator=collator,
+            py_logger=logger
+        )
 
     # saving structure assumes deepspeed strategy
     assert isinstance(trainer.strategy, pl.strategies.DeepSpeedStrategy)
