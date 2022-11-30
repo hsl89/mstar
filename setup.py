@@ -65,7 +65,7 @@ requirements = [
     "protobuf<=3.20.1",
 ]
 
-tests_require = ["prospector", "pytest", "pytest-mock", "moto", "lorem"]
+tests_require = ["pylint==2.15.6", "prospector", "pytest", "pytest-mock", "moto", "lorem"]
 
 rlfh_require = [
     "transformers==4.18.0",
