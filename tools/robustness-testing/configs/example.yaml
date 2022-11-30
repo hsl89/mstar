@@ -1,0 +1,24 @@
+name: "b20-"
+node_num: 1
+image: 747303060528.dkr.ecr.REGION_TAG.amazonaws.com/mstar-eks:robustness-testing-autobatching-subsample-v3
+command: ["python3", "main.py"]
+args: [
+    "--output_dir", "/mnt_out/test",
+    "--device", "cuda",
+]
+model_api: "mstar-seq2seq"
+model: "mstar-t5-20B-bedrock"
+revisions: [stage_3_t5_normloss_wtavg]
+add_special_tokens: True
+special_prefix_token_id: 34175
+special_prefix_token: "<extra_id_0>"
+datasets: ['superglue_rte', 'mnli', race, gem_xsum, e2e_nlg_cleaned, 'sst', 'wic', 'wsc', 'wnli']
+num_fewshot: [0, 3]
+
+subsample_factor:
+    gem_xsum: 10
+    e2e_nlg_cleaned: 10
+    mnli: 10
+    race: 10
+
+run_no: 1
