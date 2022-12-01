@@ -13,6 +13,7 @@ from mstar.utils.lightning import KubeFlowEnvironment, MStarEKSLogger
 import torch as th
 import pytorch_lightning as pl
 import deepspeed
+import omegaconf
 
 # local imports
 import models
@@ -26,6 +27,9 @@ def main(cfg):
     """
     Launch pretraining
     """
+    #resolve config and interpolate values now
+    #otherwise issues later with instantiation
+    omegaconf.OmegaConf.resolve(cfg)
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
@@ -37,7 +41,6 @@ def main(cfg):
 
     logger.info("Configuration args")
     logger.info(cfg)
-
     # If dataloader is already multiprocessing, skip this
     if cfg.data.num_workers > 0:
         os.environ["TOKENIZERS_PARALLELISM"] = "False"
@@ -46,17 +49,17 @@ def main(cfg):
     kubeflow_num_nodes = int(os.environ["NUM_NODES"])
 
     computed_total_batch_size = (
-        cfg.trainer.num_nodes * cfg.optimizer.micro_batch_size * th.cuda.device_count()
+        cfg.trainer.num_nodes * cfg.optimization.micro_batch_size * th.cuda.device_count()
     )
     logging.info(
         f"Training with {cfg.trainer.num_nodes} nodes "
-        f"micro-batch size {cfg.optimizer.micro_batch_size} "
+        f"micro-batch size {cfg.optimization.micro_batch_size} "
         f"total batch size {computed_total_batch_size}"
         f"and {th.cuda.device_count()} devices per-node"
     )
     
     # Set seed before initializing model
-    pl.utilities.seed.seed_everything(cfg.optimizer.seed)
+    pl.utilities.seed.seed_everything(cfg.optimization.seed)
 
     tokenizer = hydra.utils.call(cfg.tokenizer)
 
@@ -113,18 +116,11 @@ def main(cfg):
 
     trainer = pl.Trainer(
         **cfg.trainer,
-        accelerator="gpu",
         callbacks=callbacks,
         plugins=plugins,
         strategy=strategy,
         logger=mstar_logger,
     )
-   
-    from omegaconf import OmegaConf
-    cfg_as_dict = OmegaConf.to_container(cfg)
-    #cfg["recursive"]=False
-    #print(cfg_as_dict)
-    #raise ValueError
  
     assert len(list(filter(None,[cfg.model.state_dict_path,cfg.model.ckpt_path])))<=1, "Resume from either cfg.model.state_dict_path or cfg.model.ckpt_path not both"
 
@@ -135,25 +131,22 @@ def main(cfg):
         state_dict_path=cfg.model.state_dict_path,
     )
     
-    #TODO(colehawk) full experiment config
-    #full_experiment_config=cfg,  # pass full cfg over for easier logging
-
     if cfg.data.source=="mtl":
 
         VAL_LOSS_NAMES = ['labeled_val_loss', 'validation_loss']
-        assert (cfg.optimizer.labeled_micro_batch_size+cfg.optimizer.unlabeled_micro_batch_size == cfg.optimizer.micro_batch_size), 'Sum of unlabeled and labeled micro-batch-size should equal to the total micro-batch-size'
+        assert (cfg.optimization.labeled_micro_batch_size+cfg.optimization.unlabeled_micro_batch_size == cfg.optimization.micro_batch_size), 'Sum of unlabeled and labeled micro-batch-size should equal to the total micro-batch-size'
         #######****SETUP MTL DATA-MODULE******##################
         #since we shard in the datamodule, don't let PTL re-shard
         assert cfg.trainer.replace_sampler_ddp is False
 
         #Unlabeled data module
-        if cfg.optimizer.unlabeled_micro_batch_size > 0:
+        if cfg.optimization.unlabeled_micro_batch_size > 0:
                 unlabeled_data_module = data.datamodule.HFDataModule(
                 tokenizer=tokenizer,
                 training_datasets=cfg.data.training_datasets,
                 validation_datasets=cfg.data.validation_datasets,
-                seed=cfg.optimizer.seed,
-                micro_batch_size=cfg.optimizer.unlabeled_micro_batch_size,
+                seed=cfg.optimization.seed,
+                micro_batch_size=cfg.optimization.unlabeled_micro_batch_size,
                 data_args=cfg.data,
                 data_collator=collator,
                 py_logger=logger,
@@ -164,8 +157,8 @@ def main(cfg):
         data_module = hydra.utils.instantiate(
             cfg.lightning.data_module,
             tokenizer=tokenizer,
-            labeled_batch=cfg.optimizer.labeled_micro_batch_size,
-            unlabeled_batch=cfg.optimizer.unlabeled_micro_batch_size,
+            labeled_batch=cfg.optimization.labeled_micro_batch_size,
+            unlabeled_batch=cfg.optimization.unlabeled_micro_batch_size,
             max_seq_length=cfg.data.max_seq_length,
             labeled_max_ip_seq_len=cfg.data.max_seq_length,
             labeled_max_op_seq_len=cfg.data.max_output_length,
@@ -180,10 +173,9 @@ def main(cfg):
                 full_experiment_config=cfg,
                 model_init_fn=model_init_fn,
                 py_logger=logger,
-                optimizer_cfg=cfg.optimizer,
-                scheduler_mult_factor=cfg.optimizer.scheduler_mult_factor,  # used to resume from a checkpoint with an adjusted scheduler, will reload scheduler otherwise
-                unlabeled_batch_size=cfg.optimizer.unlabeled_micro_batch_size,
-                labeled_batch_size=cfg.optimizer.labeled_micro_batch_size,
+                optimizer_cfg=cfg.optimization,
+                unlabeled_batch_size=cfg.optimization.unlabeled_micro_batch_size,
+                labeled_batch_size=cfg.optimization.labeled_micro_batch_size,
                 tokenizer=tokenizer,
                 val_loss_names=VAL_LOSS_NAMES
             )
@@ -196,8 +188,7 @@ def main(cfg):
                 full_experiment_config=cfg,
                 model_init_fn=model_init_fn,
                 py_logger=logger,
-                optimizer_cfg=cfg.optimizer,
-                scheduler_mult_factor=cfg.optimizer.scheduler_mult_factor,  # used to resume from a checkpoint with an adjusted scheduler, will reload scheduler otherwise
+                optimizer_cfg=cfg.optimization,
             )
 
         #since we shard in the datamodule, don't let PTL re-shard
@@ -207,8 +198,8 @@ def main(cfg):
             tokenizer=tokenizer,
             training_datasets=cfg.data.training_datasets,
             validation_datasets=cfg.data.validation_datasets,
-            seed=cfg.optimizer.seed,
-            micro_batch_size=cfg.optimizer.micro_batch_size,
+            seed=cfg.optimization.seed,
+            micro_batch_size=cfg.optimization.micro_batch_size,
             data_args=cfg.data,
             data_collator=collator,
             py_logger=logger

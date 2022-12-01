@@ -2,7 +2,6 @@ _target_: models.mtl_modelmodule.PlModelMTL
 model_init_fn: null
 py_logger: null
 optimizer_cfg: null
-scheduler_mult_factor: null
 full_experiment_config: null
 unlabeled_batch_size : null
 labeled_batch_size : null

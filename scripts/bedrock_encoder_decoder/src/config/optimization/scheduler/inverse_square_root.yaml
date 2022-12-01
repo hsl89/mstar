@@ -1,0 +1,5 @@
+_target_: models.modelmodule.get_inverse_sqrt_schedule
+optimizer: null #fill at runtime
+num_warmup_steps: 10000
+scale_factor: 10000
+num_constant_steps: 0

@@ -3,6 +3,7 @@ Pytorch lightning wrapper for module
 """
 import time
 import mstar
+import hydra
 import pytorch_lightning as pl
 import torch as th
 import transformers
@@ -13,16 +14,19 @@ from transformers.trainer_pt_utils import get_parameter_names
 import math
 from torch.optim.lr_scheduler import LambdaLR
 
-def get_inverse_sqrt_schedule(optimizer, warmup_steps, last_epoch=-1):
+def get_inverse_sqrt_schedule(optimizer, num_warmup_steps, scale_factor=10000, num_constant_steps=0, last_epoch=-1):
     """Inverse square root learning rate schedule with linear warmup from 0
-	lr = min(step_num*max_lr/warmup_steps, max_lr/sqrt(current_step)
 
     Args:
         optimizer (:class:`~torch.optim.Optimizer`):
             The optimizer for which to schedule the learning rate.
             The total number of training steps.
-        warmup_steps (:obj:`int`):
+        num_warmup_steps (:obj:`int`):
             The number of steps for the warmup phase.
+        scale_factor (:obj:`int`):
+            A scaling constant that increases/decreases the decay rate
+        num_constant_steps (:obj:`int`):
+            The number of steps to hold the max LR constant after warmup
         last_epoch (:obj:`int`, `optional`, defaults to -1):
             The index of the last epoch when resuming training.
 
@@ -33,29 +37,18 @@ def get_inverse_sqrt_schedule(optimizer, warmup_steps, last_epoch=-1):
 
     def lr_lambda(global_step: int):
 
-        if global_step <= warmup_steps:
-            return global_step / warmup_steps
+        if global_step <= num_warmup_steps:
+            return global_step / num_warmup_steps
+        elif num_warmup_steps < global_step <= num_warmup_steps+num_constant_steps:
+            return 1.0
         else:
-            return math.sqrt(warmup_steps) / math.sqrt(global_step)
+            #The scale_factor is used to ensure decay is not too rapid.
+            #Pure pure 1/sqrt(n) decay leads to 100x decay within 10k steps.
+            #scale_factor is present in both the numerator and denominator since 
+            #the LambdaLR provides a multipler to optimizer.lr which should be 1 at the end of warmup
+            return math.sqrt(scale_factor) / math.sqrt(scale_factor+global_step-num_warmup_steps-num_constant_steps)
 
     return LambdaLR(optimizer, lr_lambda, last_epoch)
-
-
-def get_optimizer(optim_groups, learning_rate, optimizer_cfg):
-    optim_cls = {"fusedadam": FusedAdam}[optimizer_cfg.optimizer]
-
-    args = [optim_groups]
-    kwargs = {
-        "lr": learning_rate,
-        "eps": optimizer_cfg.adam_epsilon,
-        "betas": (optimizer_cfg.adam_beta1, optimizer_cfg.adam_beta2),
-    }
-    if optimizer_cfg.optimizer in {"fusedadam"}:
-        kwargs["adam_w_mode"] = optimizer_cfg.adam_w_mode
-
-    optimizer = optim_cls(*args, **kwargs)
-    return optimizer
-
 
 class PlModel(pl.LightningModule):
     """
@@ -68,34 +61,16 @@ class PlModel(pl.LightningModule):
         model_init_fn,
         py_logger,
         optimizer_cfg,
-        scheduler_mult_factor=None,
     ):
         super().__init__()
         self.full_experiment_config = full_experiment_config
         self.model_init_fn = model_init_fn
         self.py_logger = py_logger
         self.optimizer_cfg = optimizer_cfg
-        self.scheduler_mult_factor = scheduler_mult_factor
 
     def setup(self, stage):
 
         self.model = self.model_init_fn()
-        # always use gradient checkpointing
-        #self.model.gradient_checkpointing_enable()
-
-    def on_train_start(self):
-
-        if self.scheduler_mult_factor is not None:
-            # used to add additional lr scheduler multiplier after checkpoint load
-            # otherwise checkpoint load resumes from old scheduler
-            # assumes all schedulers are lr lambda schedulers
-            self.py_logger.info(
-                f"Multiplying all LR schedule lambas by {self.scheduler_mult_factor}"
-            )
-            self.lr_schedulers().lr_lambdas = [
-                lambda x: self.scheduler_mult_factor * fn(x)
-                for fn in self.lr_schedulers().lr_lambdas
-            ]
 
     def training_step(self, batch, batch_idx):
 
@@ -174,6 +149,16 @@ class PlModel(pl.LightningModule):
         )
         return {"loss": loss, "num_loss_tokens": num_loss_tokens}
 
+    def on_train_start(self):
+        
+        #override the lambda schedulers
+        #default configs do not adjust the schedulers 
+        self.lr_schedulers().lr_lambdas = [
+                lambda x: self.full_experiment_config.optimization.override.mult_factor * fn(x+self.full_experiment_config.optimization.override.add_index)
+                for fn in self.lr_schedulers().lr_lambdas
+        ]
+
+
     def validation_epoch_end(self, outputs):
 
         loss = th.stack([out["loss"] for out in outputs]).sum()
@@ -196,9 +181,6 @@ class PlModel(pl.LightningModule):
         #log here since it occurs after ddp launches
         self.logger.log_hyperparams(self.full_experiment_config)
 
-        assert self.trainer.max_steps
-        # Infer learning rate
-        learning_rate = self.optimizer_cfg.base_learning_rate
 
         # create the optimizer, exclude "bias", "LayerNorm" from decaying
         decay_parameters = get_parameter_names(self.model, [th.nn.LayerNorm])
@@ -223,30 +205,16 @@ class PlModel(pl.LightningModule):
             if not any(nd in n for nd in decay_parameters)
         ]
 
-        optim_groups = [
-            {"params": params_decay, "weight_decay": self.optimizer_cfg.weight_decay},
+        param_groups = [
+            {"params": params_decay, "weight_decay": self.optimizer_cfg.optimizer.weight_decay},
             {"params": params_nodecay, "weight_decay": 0.0},
         ]
 
-        optimizer = get_optimizer(optim_groups, learning_rate, self.optimizer_cfg)
+        #need convert="partial" to avoid hydra converting 
+        #param_groups into an OmegaConf, which breaks optimizer creation 
+        optimizer = hydra.utils.instantiate(self.full_experiment_config.optimization.optimizer, _convert_="partial", params=param_groups)
 
-        if self.optimizer_cfg.lr_scheduler_type == "inverse_square_root":
-            scheduler = get_inverse_sqrt_schedule(
-                optimizer, self.optimizer_cfg.warmup_steps, last_epoch=-1
-            )
-
-        elif self.optimizer_cfg.lr_scheduler_type == "linear":
-            scheduler = transformers.optimization.get_scheduler(
-                self.optimizer_cfg.lr_scheduler_type,
-                optimizer,
-                num_warmup_steps=self.optimizer_cfg.warmup_steps,
-                num_training_steps=self.trainer.max_steps,
-            )
-        else:
-            raise NotImplementedError(
-                "Optimizer schedule {}".format(self.optimizer_cfg.lr_scheduler_type)
-            )
-
+        scheduler = hydra.utils.call(self.full_experiment_config.optimization.scheduler, optimizer=optimizer)
         return (
             [optimizer],
             [

@@ -2,6 +2,7 @@
 Pytorch lightning wrapper for module
 """
 import time
+import hydra
 import mstar
 import pytorch_lightning as pl
 import torch as th
@@ -13,8 +14,6 @@ from transformers.trainer_pt_utils import get_parameter_names
 import math
 from torch.optim.lr_scheduler import LambdaLR
 
-from models.modelmodule import get_inverse_sqrt_schedule 
-from models.modelmodule import get_optimizer 
 from models.modelmodule import PlModel
 
 from collators import t5_collator
@@ -32,7 +31,6 @@ class PlModelMTL(PlModel):
         model_init_fn,
         py_logger,
         optimizer_cfg,
-        scheduler_mult_factor=None,
         unlabeled_batch_size = 0,
         labeled_batch_size = 1,
         tokenizer = None,
@@ -44,7 +42,6 @@ class PlModelMTL(PlModel):
             model_init_fn=model_init_fn,
             py_logger=py_logger,
             optimizer_cfg=optimizer_cfg,
-            scheduler_mult_factor=scheduler_mult_factor, # used to resume from a checkpoint with an adjusted scheduler, will reload scheduler otherwise
         )
         self.unlabeled_batch_size = unlabeled_batch_size
         self.labeled_batch_size = labeled_batch_size
@@ -299,8 +296,6 @@ class PlModelMTL(PlModel):
         # full_experiment_config)
 
         assert self.trainer.max_steps
-        # Infer learning rate
-        learning_rate = self.optimizer_cfg.base_learning_rate
 
         # create the optimizer, exclude "bias", "LayerNorm" from decaying
         decay_parameters = get_parameter_names(self.model, [th.nn.LayerNorm])
@@ -325,30 +320,16 @@ class PlModelMTL(PlModel):
             if not any(nd in n for nd in decay_parameters)
         ]
 
-        optim_groups = [
-            {"params": params_decay, "weight_decay": self.optimizer_cfg.weight_decay},
+        param_groups = [
+            {"params": params_decay, "weight_decay": self.optimizer_cfg.optimizer.weight_decay},
             {"params": params_nodecay, "weight_decay": 0.0},
         ]
 
-        optimizer = get_optimizer(optim_groups, learning_rate, self.optimizer_cfg)
+        #need convert="partial" to avoid hydra converting 
+        #param_groups into an OmegaConf, which breaks optimizer creation 
+        optimizer = hydra.utils.instantiate(self.full_experiment_config.optimization.optimizer, _convert_="partial", params=param_groups)
 
-        if self.optimizer_cfg.lr_scheduler_type == "inverse_square_root":
-            scheduler = get_inverse_sqrt_schedule(
-                optimizer, self.optimizer_cfg.warmup_steps, last_epoch=-1
-            )
-        elif self.optimizer_cfg.lr_scheduler_type == "linear" or\
-             self.optimizer_cfg.lr_scheduler_type=='constant' or\
-             self.optimizer_cfg.lr_scheduler_type=='constant_with_warmup':
-            scheduler = transformers.optimization.get_scheduler(
-                self.optimizer_cfg.lr_scheduler_type,
-                optimizer,
-                num_warmup_steps=self.optimizer_cfg.warmup_steps,
-                num_training_steps=self.trainer.max_steps,
-            )
-        else:
-            raise NotImplementedError(
-                "Optimizer schedule {}".format(self.optimizer_cfg.lr_scheduler_type)
-            )
+        scheduler = hydra.utils.call(self.full_experiment_config.optimization.scheduler, optimizer=optimizer)
 
         return (
             [optimizer],

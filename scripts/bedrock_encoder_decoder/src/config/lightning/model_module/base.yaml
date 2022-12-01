@@ -4,5 +4,4 @@ _target_: models.modelmodule.PlModel
 model_init_fn: null
 py_logger: null
 optimizer_cfg: null
-scheduler_mult_factor: null
 full_experiment_config: null

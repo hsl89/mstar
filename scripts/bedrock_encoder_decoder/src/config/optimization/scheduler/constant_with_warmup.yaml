@@ -1,0 +1,5 @@
+_target_: transformers.optimization.get_scheduler
+optimizer: null #fill at runtime
+name: "constant_with_warmup"
+num_warmup_steps: 3000
+num_training_steps: ${...max_steps} #get value via interpolation
