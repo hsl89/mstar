@@ -1,5 +1,5 @@
 from transformers import BertPreTrainedModel, XLMRobertaModel
-import torch.nn as nn
+from torch import nn
 import torch
 
 class MultiheadDescriptionModel(BertPreTrainedModel):
@@ -17,7 +17,8 @@ class MultiheadDescriptionModel(BertPreTrainedModel):
         for task in mtl_args["tasks"]:
             self.heads.append(TokenClassificationDecoder(config.hidden_size, task, mtl_args["task_label_map"]))
         self.init_weights()
-        
+    
+    # pylint: disable=unused-argument
     def forward(
         self,
         input_ids=None,
@@ -121,6 +122,7 @@ class TokenClassificationDecoder(nn.Module):
         self.dropout = nn.Dropout(0.1)
         self.model = nn.Linear(hidden_size*2, self.num_labels)
 
+    # pylint: disable=unused-argument
     def forward(self, sequence_output, attention_mask, description_output=None, labels=None, **kwargs):
         loss = None
 

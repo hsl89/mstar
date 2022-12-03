@@ -1,9 +1,9 @@
 # The only difference to the base model is that the target task model is meant to have only a single task so it returns an object of class TokenClassifierOutput so it can directly use the HF trainer
 
-from transformers import BertPreTrainedModel, XLMRobertaConfig
-from mstar.models.task_embedding_model.xlmr import TaskEmbeddingRobertaModel
-import torch.nn as nn
 import torch
+from transformers import BertPreTrainedModel
+from mstar.models.task_embedding_model.xlmr import TaskEmbeddingRobertaModel
+from torch import nn
 from transformers.modeling_outputs import TokenClassifierOutput
 
 class TaskEmbeddingMultiheadModel(BertPreTrainedModel):
@@ -111,6 +111,7 @@ class TokenClassificationDecoder(nn.Module):
         self.dropout = nn.Dropout(0.1)
         self.model = nn.Linear(hidden_size, self.num_labels)
 
+    # pylint: disable=unused-argument
     def forward(self, sequence_output, attention_mask, labels=None, **kwargs):
         loss = None
         sequence_output = self.dropout(sequence_output)

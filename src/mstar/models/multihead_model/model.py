@@ -1,7 +1,6 @@
-from transformers import BertPreTrainedModel, XLMRobertaConfig, XLMRobertaModel
-import torch.nn as nn
 import torch
-import pdb
+from transformers import BertPreTrainedModel, XLMRobertaModel
+from torch import nn
 
 class MultiheadModel(BertPreTrainedModel):
     def __init__(
@@ -22,7 +21,8 @@ class MultiheadModel(BertPreTrainedModel):
             elif mtl_args["task_kind"][i] == "qa":
                 self.heads.append(QADecoder(config.hidden_size, task, mtl_args["task_label_map"]))
         self.init_weights()
-        
+    
+    # pylint: disable=unused-argument
     def forward(
         self,
         input_ids=None,
@@ -80,19 +80,19 @@ class MultiheadModel(BertPreTrainedModel):
             # print(unique_task_id)
             # pdb.set_trace()
 
-            if type(self.heads[decoder_id]) == TokenClassificationDecoder:
+            if isinstance(self.heads[decoder_id], TokenClassificationDecoder):
                 logits, loss = self.heads[decoder_id](
                         sequence_output[current_task_filter],
                         attention_mask=attention_mask[current_task_filter],
                         labels=None if labels is None else labels[current_task_filter],
                     )
-            elif type(self.heads[decoder_id]) == GlueDecoder:
+            elif isinstance(self.heads[decoder_id], GlueDecoder):
                 logits, loss = self.heads[decoder_id](
                         sequence_output[current_task_filter],
                         attention_mask=attention_mask[current_task_filter],
                         labels=None if labels is None else glue_labels[current_task_filter],
                     )
-            elif type(self.heads[decoder_id]) == QADecoder:
+            elif isinstance(self.heads[decoder_id], QADecoder):
                 assert start_positions is not None # , print(qa_spans)
                 # pdb.set_trace()
                 logits, loss = self.heads[decoder_id](
@@ -127,6 +127,7 @@ class TokenClassificationDecoder(nn.Module):
         self.dropout = nn.Dropout(0.1)
         self.model = nn.Linear(hidden_size, self.num_labels)
 
+    # pylint: disable=unused-argument
     def forward(self, sequence_output, attention_mask, labels=None, **kwargs):
         loss = None
         sequence_output = self.dropout(sequence_output)
@@ -157,6 +158,7 @@ class GlueDecoder(torch.nn.Module):
         self.dropout = nn.Dropout(0.1)
         self.model = nn.Linear(hidden_size, self.num_labels)
 
+    # pylint: disable=unused-argument
     def forward(self, sequence_output, attention_mask, labels=None, **kwargs):
         loss = None
         pooled_output = sequence_output[:, 0, :] # Output of the <s> token
@@ -181,6 +183,7 @@ class QADecoder(nn.Module):
         self.num_labels = task_label_map[task_name] # config.num_labels
         self.qa_outputs = nn.Linear(hidden_size, self.num_labels)
 
+    # pylint: disable=unused-argument
     def forward(self, sequence_output, attention_mask, start_positions=None, end_positions = None, **kwargs):
         loss = None
         logits = self.qa_outputs(sequence_output)

@@ -1,7 +1,7 @@
-from transformers import BertPreTrainedModel, XLMRobertaConfig
-from mstar.models.task_embedding_model.xlmr import TaskEmbeddingRobertaModel
-import torch.nn as nn
 import torch
+from transformers import BertPreTrainedModel
+from mstar.models.task_embedding_model.xlmr import TaskEmbeddingRobertaModel
+from torch import nn
 
 class TaskEmbeddingMultiheadModel(BertPreTrainedModel):
     def __init__(
@@ -20,7 +20,8 @@ class TaskEmbeddingMultiheadModel(BertPreTrainedModel):
             elif mtl_args["task_kind"][i] == "glue":
                 self.heads.append(GlueDecoder(config.hidden_size, task, mtl_args["task_label_map"]))
         self.init_weights()
-        
+    
+    # pylint: disable=unused-argument
     def forward(
         self,
         input_ids=None,
@@ -80,13 +81,13 @@ class TaskEmbeddingMultiheadModel(BertPreTrainedModel):
             decoder_id = unique_task_id
 
             # Access that particular decoder and run a forward pass
-            if type(self.heads[decoder_id]) == TokenClassificationDecoder:
+            if isinstance(self.heads[decoder_id], TokenClassificationDecoder):
                 logits, loss = self.heads[decoder_id](
                         sequence_output[current_task_filter],
                         attention_mask=attention_mask[current_task_filter],
                         labels=None if labels is None else labels[current_task_filter],
                     )
-            elif type(self.heads[decoder_id]) == GlueDecoder:
+            elif isinstance(self.heads[decoder_id], GlueDecoder):
                 logits, loss = self.heads[decoder_id](
                         sequence_output[current_task_filter],
                         attention_mask=attention_mask[current_task_filter],
@@ -117,6 +118,7 @@ class TokenClassificationDecoder(nn.Module):
         self.dropout = nn.Dropout(0.1)
         self.model = nn.Linear(hidden_size, self.num_labels)
 
+    # pylint: disable=unused-argument
     def forward(self, sequence_output, attention_mask, labels=None, **kwargs):
         loss = None
         sequence_output = self.dropout(sequence_output)
@@ -146,6 +148,7 @@ class GlueDecoder(torch.nn.Module):
         self.dropout = nn.Dropout(0.1)
         self.model = nn.Linear(hidden_size, self.num_labels)
 
+    # pylint: disable=unused-argument
     def forward(self, sequence_output, attention_mask, labels=None, **kwargs):
         loss = None
         pooled_output = sequence_output[:, 1, :] # Output of the <s> token

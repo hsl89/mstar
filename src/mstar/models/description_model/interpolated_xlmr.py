@@ -1,7 +1,7 @@
 from transformers import RobertaConfig, PreTrainedModel, AutoConfig
 from transformers.models.roberta.modeling_roberta import RobertaEmbeddings, RobertaEncoder, RobertaPooler
 from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
-import torch.nn as nn
+from torch import nn
 import torch
 
 class RobertaPreTrainedModel(PreTrainedModel):
@@ -52,7 +52,7 @@ class InterpolatedRobertaModel(RobertaPreTrainedModel):
     _keys_to_ignore_on_load_missing = [r"position_ids"]
 
     # Copied from transformers.models.bert.modeling_bert.BertModel.__init__ with Bert->Roberta
-    def __init__(self, config, num_tasks = 1, add_pooling_layer=True):
+    def __init__(self, config, num_tasks = 1, add_pooling_layer=True): # pylint: disable=unused-argument
         super().__init__(config)
         self.config = config
 
@@ -78,6 +78,7 @@ class InterpolatedRobertaModel(RobertaPreTrainedModel):
         for layer, heads in heads_to_prune.items():
             self.encoder.layer[layer].attention.prune_heads(heads)
 
+    # pylint: disable=pointless-string-statement, unused-argument
     """
 [DOCS]    @add_start_docstrings_to_model_forward(ROBERTA_INPUTS_DOCSTRING.format("(batch_size, sequence_length)"))
     @add_code_sample_docstrings(
@@ -234,6 +235,7 @@ class InterpolatedRobertaModel(RobertaPreTrainedModel):
         )
 
 
+# pylint: disable=pointless-string-statement
 """
 class XLMRobertaModel(RobertaModel):
     " " "

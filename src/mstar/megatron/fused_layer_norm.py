@@ -37,51 +37,51 @@ fused_mix_prec_layer_norm_cuda = None
 
 class FusedLayerNormAffineFunction(torch.autograd.Function):
 
-  @staticmethod
-  def forward(ctx, input, weight, bias, normalized_shape, eps):  # pylint: disable=redefined-builtin
+    @staticmethod
+    def forward(ctx, input, weight, bias, normalized_shape, eps):  # pylint: disable=redefined-builtin
 
-    ctx.normalized_shape = normalized_shape
-    ctx.eps = eps
-    input_ = input.contiguous()
-    weight_ = weight.contiguous()
-    bias_ = bias.contiguous()
-    output, mean, invvar = fused_mix_prec_layer_norm_cuda.forward_affine(
-        input_, ctx.normalized_shape, weight_, bias_, ctx.eps)
-    ctx.save_for_backward(input_, weight_, bias_, mean, invvar)
+        ctx.normalized_shape = normalized_shape
+        ctx.eps = eps
+        input_ = input.contiguous()
+        weight_ = weight.contiguous()
+        bias_ = bias.contiguous()
+        output, mean, invvar = fused_mix_prec_layer_norm_cuda.forward_affine(
+            input_, ctx.normalized_shape, weight_, bias_, ctx.eps)
+        ctx.save_for_backward(input_, weight_, bias_, mean, invvar)
 
-    return output
+        return output
 
 
-  @staticmethod
-  def backward(ctx, grad_output):
+    @staticmethod
+    def backward(ctx, grad_output):
 
-    input_, weight_, bias_, mean, invvar = ctx.saved_tensors
-    grad_input = grad_weight = grad_bias = None
-    grad_input, grad_weight, grad_bias \
-      = fused_mix_prec_layer_norm_cuda.backward_affine(
-        grad_output.contiguous(), mean, invvar,
-        input_, ctx.normalized_shape,
-        weight_, bias_, ctx.eps)
+        input_, weight_, bias_, mean, invvar = ctx.saved_tensors
+        grad_input = grad_weight = grad_bias = None
+        grad_input, grad_weight, grad_bias \
+            = fused_mix_prec_layer_norm_cuda.backward_affine(
+                grad_output.contiguous(), mean, invvar,
+                input_, ctx.normalized_shape,
+                weight_, bias_, ctx.eps)
 
-    return grad_input, grad_weight, grad_bias, None, None
+        return grad_input, grad_weight, grad_bias, None, None
 
 
 
 class MixedFusedLayerNorm(torch.nn.Module):
 
-  def __init__(self, normalized_shape, eps=1e-5, no_persist_layer_norm=True):
+    def __init__(self, normalized_shape, eps=1e-5, no_persist_layer_norm=True):
         super().__init__()  # noqa
 
         global fused_mix_prec_layer_norm_cuda
         fused_mix_prec_layer_norm_cuda = importlib.import_module(
-          "mstar.fused_mix_prec_layer_norm_cuda")
+            "mstar.fused_mix_prec_layer_norm_cuda")
 
         # List of hiddens sizes supported in the persistent layer norm kernel
         # If the hidden size is not supported, fall back to the non-persistent
         # kernel.
         persist_ln_hidden_sizes = [1024, 1536, 2048, 2304, 3072, 3840, 4096,
-            5120, 6144, 8192, 10240, 12288, 12800, 15360, 16384, 18432, 20480,
-            24576, 25600, 30720, 32768, 40960, 49152, 65536]
+        5120, 6144, 8192, 10240, 12288, 12800, 15360, 16384, 18432, 20480,
+        24576, 25600, 30720, 32768, 40960, 49152, 65536]
         if normalized_shape not in persist_ln_hidden_sizes or \
                 not HAVE_PERSIST_LAYER_NORM:
             no_persist_layer_norm = True
@@ -96,17 +96,17 @@ class MixedFusedLayerNorm(torch.nn.Module):
         self.no_persist_layer_norm = no_persist_layer_norm
 
 
-  def reset_parameters(self):
+    def reset_parameters(self):
 
-    init.ones_(self.weight)
-    init.zeros_(self.bias)
+        init.ones_(self.weight)
+        init.zeros_(self.bias)
 
 
-  def forward(self, input):  # pylint: disable=redefined-builtin
+    def forward(self, input):  # pylint: disable=redefined-builtin
 
-    if self.no_persist_layer_norm:
-        return FusedLayerNormAffineFunction.apply(
-          input, self.weight, self.bias, self.normalized_shape, self.eps)
-    else:
-        return FastLayerNormFN.apply(
-          input, self.weight, self.bias, self.eps)
+        if self.no_persist_layer_norm:
+            return FusedLayerNormAffineFunction.apply(
+            input, self.weight, self.bias, self.normalized_shape, self.eps)
+        else:
+            return FastLayerNormFN.apply(
+            input, self.weight, self.bias, self.eps)

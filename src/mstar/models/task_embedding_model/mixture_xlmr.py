@@ -1,10 +1,9 @@
-from transformers import XLMRobertaConfig, RobertaConfig, PreTrainedModel, AutoConfig
+from transformers import RobertaConfig, PreTrainedModel, AutoConfig
 from transformers.models.roberta.modeling_roberta import RobertaEmbeddings, RobertaEncoder, RobertaPooler
 from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 import torch
-import pdb
 
 class RobertaPreTrainedModel(PreTrainedModel):
     """
@@ -85,6 +84,7 @@ class TaskEmbeddingMixtureRobertaModel(RobertaPreTrainedModel):
         for layer, heads in heads_to_prune.items():
             self.encoder.layer[layer].attention.prune_heads(heads)
 
+    # pylint: disable=pointless-string-statement, unused-argument
     """
 [DOCS]    @add_start_docstrings_to_model_forward(ROBERTA_INPUTS_DOCSTRING.format("(batch_size, sequence_length)"))
     @add_code_sample_docstrings(
@@ -243,6 +243,7 @@ class TaskEmbeddingMixtureRobertaModel(RobertaPreTrainedModel):
         )
 
 
+# pylint: disable=pointless-string-statement
 """
 class XLMRobertaModel(RobertaModel):
     " " "
@@ -255,5 +256,5 @@ class XLMRobertaModel(RobertaModel):
 
 if __name__ == "__main__":
     config = AutoConfig.from_pretrained("xlm-roberta-base")
-    model = ModifiedRobertaModel(config)
+    model = TaskEmbeddingMixtureRobertaModel(config)
     print(model)

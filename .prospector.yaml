@@ -2,6 +2,7 @@ max-line-length: 300
 
 ignore-paths:
   - src/mstar/models/m5_models/bert.py # Track in issue https://gitlab.aws.dev/mstar/mstar/-/issues/20
+  - src/mstar/models/mxnet_1_compat/bert.py
 
 pyflakes:
   disable:
@@ -9,6 +10,7 @@ pyflakes:
     - F821
     - F841
     - F523
+    - F811
 
 mccabe:
   disable:
