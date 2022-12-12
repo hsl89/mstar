@@ -10,7 +10,7 @@ import yaml
 CONFIG_PATH = "config/model/base.yaml"
 
 with open(CONFIG_PATH, "r") as fp:
-    yaml_conf = yaml.load(fp)
+    yaml_conf = yaml.safe_load(fp)
 
 print(yaml_conf)
 

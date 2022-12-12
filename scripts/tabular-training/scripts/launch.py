@@ -98,7 +98,7 @@ else:
 
 
 # load base config file, then overwrite
-base_config = yaml.load(open(BASE_FILE, "r"), Loader=yaml.FullLoader)
+base_config = yaml.safe_load(open(BASE_FILE, "r"))
 base_config["node_type"] = args.node_type
 
 # only override if >0

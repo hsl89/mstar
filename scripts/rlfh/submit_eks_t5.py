@@ -14,7 +14,7 @@ def run(args):
     sweep_value = [1,2,3]
 
     #load base config file, then overwrite
-    base_config = yaml.load(open(BASE_FILE,'r'),Loader=yaml.FullLoader)
+    base_config = yaml.safe_load(open(BASE_FILE,'r'))
 
     commands = base_config['command']
 
