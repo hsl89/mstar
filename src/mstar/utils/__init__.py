@@ -7,5 +7,6 @@ from . import registry
 from . import shm
 from . import data
 from . import flops_calc
+from . import alibi
 
-__all__ = ['misc', 'lightning', 'executors', 'torch', 'registry', 'shm', 'data', 'flops_calc']
+__all__ = ['misc', 'lightning', 'executors', 'torch', 'registry', 'shm', 'data', 'flops_calc', 'alibi']
