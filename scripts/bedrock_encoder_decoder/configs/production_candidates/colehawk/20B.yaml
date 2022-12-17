@@ -1,0 +1,20 @@
+args:
+- pretrain_main.py
+- run_name=20B_linear_continued
+- trainer.max_steps=100000
+- optimization.micro_batch_size=2
+- optimization/scheduler=linear
+- optimization.optimizer.lr=0.00005
+- trainer.limit_val_batches=50
+- tokenizer.pretrained_model_name_or_path=/mnt/tokenizer/mstar-t5-20B-bedrock-stage_2_t5_600B_embed_fix-nfkc
+- trainer.val_check_interval=2999
+- lightning.callbacks.checkpoint.every_n_train_steps=3000
+- model=20B
+- data=stage_2_11_29_22
+- model.state_dict_path=/mnt/colehawk/bedrock/pre_tokenizer_normalization/pytorch_model.bin
+command:
+- /usr/bin/python3
+image: 747303060528.dkr.ecr.us-west-2.amazonaws.com/mstar-eks:colehawk-bedrock-12-12
+name: colehawk-20B
+node_num: 64 #can be any number due to shard8
+node_type: p4de.24xlarge

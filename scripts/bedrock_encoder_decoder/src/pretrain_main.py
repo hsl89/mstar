@@ -158,7 +158,6 @@ def main(cfg):
             cfg.lightning.data_module,
             tokenizer=tokenizer,
             labeled_batch=cfg.optimization.labeled_micro_batch_size,
-            unlabeled_batch=cfg.optimization.unlabeled_micro_batch_size,
             max_seq_length=cfg.data.max_seq_length,
             labeled_max_ip_seq_len=cfg.data.max_seq_length,
             labeled_max_op_seq_len=cfg.data.max_output_length,
@@ -193,16 +192,15 @@ def main(cfg):
 
         #since we shard in the datamodule, don't let PTL re-shard
         assert cfg.trainer.replace_sampler_ddp is False
-        data_module = hydra.utils.instantiate(
-            cfg.lightning.data_module,
-            tokenizer=tokenizer,
-            training_datasets=cfg.data.training_datasets,
-            validation_datasets=cfg.data.validation_datasets,
-            seed=cfg.optimization.seed,
-            micro_batch_size=cfg.optimization.micro_batch_size,
-            data_args=cfg.data,
-            data_collator=collator,
-            py_logger=logger
+        data_module = data.datamodule.HFDataModule(
+                tokenizer=tokenizer,
+                training_datasets=cfg.data.training_datasets,
+                validation_datasets=cfg.data.validation_datasets,
+                seed=cfg.optimization.seed,
+                micro_batch_size=cfg.optimization.micro_batch_size,
+                data_args=cfg.data,
+                data_collator=collator,
+                py_logger=logger,
         )
 
     # saving structure assumes deepspeed strategy

@@ -1,0 +1,24 @@
+num_workers: 8
+clm_ratio: 0.5
+collator_output_targets: mixed_t5_clm
+max_seq_length: 2048
+max_output_length: 1024
+clm_max_output_length: 1024
+clm_max_doc: 4
+mean_noise_span: 3.0
+mlm_prob: 0.1665
+training_datasets: [
+    '/mnt/pretraining-data/package-11-25-22-v4/train1_packed_chunksize_5000.arrow',
+    '/mnt/pretraining-data/package-11-25-22-v4/train2_packed_chunksize_5000.arrow',
+    '/mnt/pretraining-data/package-11-25-22-v4/train3_packed_chunksize_5000.arrow',
+    '/mnt/pretraining-data/package-11-25-22-v4/train4_packed_chunksize_5000.arrow',
+    '/mnt/pretraining-data/package-11-25-22-v4/train5_packed_chunksize_5000.arrow',
+    '/mnt/pretraining-data/package-11-25-22-v4/train6_packed_chunksize_5000.arrow',
+    '/mnt/pretraining-data/package-11-25-22-v4/train7_packed_chunksize_5000.arrow',
+    '/mnt/pretraining-data/package-11-25-22-v4/train8_packed_chunksize_5000.arrow',
+    '/mnt/pretraining-data/package-11-25-22-v4/train9_packed_chunksize_5000.arrow'
+]
+validation_datasets: [
+    '/mnt/pretraining-data/package-11-25-22-v4/val_packed_chunksize_5000.arrow'
+]
+source: 'mix_from_lists'

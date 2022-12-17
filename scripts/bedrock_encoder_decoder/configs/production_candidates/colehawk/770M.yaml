@@ -1,0 +1,22 @@
+args:
+- pretrain_main.py
+- run_name=770M_linear_continued
+- trainer.max_steps=500000
+- optimization.micro_batch_size=4
+- optimization/scheduler=linear
+- optimization.optimizer.lr=0.00005
+- trainer.limit_val_batches=50
+- tokenizer.pretrained_model_name_or_path=/mnt/tokenizer/mstar-t5-20B-bedrock-stage_2_t5_600B_embed_fix-nfkc
+- model=770M
+- data=stage_2_11_29_22
+- data.max_output_length=512
+- data.collator_output_targets=t5
+- model.state_dict_path=/mnt/colehawk/bedrock/tmp_models/770M/pytorch_model.bin
+- trainer.val_check_interval=19999
+- lightning.callbacks.checkpoint.every_n_train_steps=20000 
+command:
+- /usr/bin/python3
+image: 747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-eks:colehawk-bedrock-12-11
+name: colehawk-770M
+node_num: 16 #can be any number due to shard8
+node_type: p4d.24xlarge

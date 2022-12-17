@@ -18,3 +18,6 @@ python3 pretrain_main.py \
     optimization.scheduler.num_warmup_steps=${WARMUP_STEPS} \
     optimization.scheduler.scale_factor=${WARMUP_STEPS} \
     trainer.num_sanity_val_steps=0 \
+    data=stage_2_11_29_22 \
+    tokenizer.pretrained_model_name_or_path=/mnt/tokenizer/mstar-t5-20B-bedrock-stage_2_t5_600B_embed_fix-nfkc \
+    #model.state_dict_path=/mnt/colehawk/bedrock/pre_tokenizer_normalization/pytorch_model.bin

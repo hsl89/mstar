@@ -6,15 +6,15 @@ Some subfolders (i.e. benchmarking) have additional requirements that need to be
 
 # Running
 
-The entry point is `pretrain_main.py`. This reads configurations from the hierarhical confi in `config/base.yaml` using the [hydra package](hydra.cc/)
+The entry point is `pretrain_main.py`. This reads configurations from the hierarhical config in `config/base.yaml` using the [hydra package](hydra.cc/)
 
 Therefore you can launch (locally) using
 ```
 python pretrain_main.py
 ```
-and override arguments as in `scripts/test_launch.sh`.
 
-Please read through the hydra documentation linked above for more examples.
+Example scripts that show overrides of config values are given in `src/scripts/sample_run.sh` and `src/scripts/mtl_sample_run.sh`
+
 
 # Notes
 The pytorch lightning datamodule is in `data/datamodule.py`

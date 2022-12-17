@@ -27,7 +27,7 @@ def load_model(
     assert precision in (32, 16, "bf16")
 
     unwrapped_state_dict = None
-    if state_dict_path:
+    if state_dict_path and trainer.is_global_zero:
         logger.info(
             f"loading the model parameters from the ckpt file {state_dict_path!r}"
         )
