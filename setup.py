@@ -61,7 +61,7 @@ requirements = [
     "ujson",
     "seqeval",
     "datasets",
-    "mlflow==1.22.0",
+    "mlflow==1.30.0",
     "protobuf<=3.20.1",
 ]
 
