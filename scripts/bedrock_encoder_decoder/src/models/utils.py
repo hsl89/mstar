@@ -3,14 +3,25 @@ General utilities to accompany model creation
 """
 
 import deepspeed
-import mstar.models.t5
+from mstar.models.t5 import MStarT5Config, MStarT5ForConditionalGeneration
 import torch as th
 import pytorch_lightning as pl
 import contextlib
 import logging
+from accelerate import init_empty_weights
 
 logger = logging.getLogger(__name__)
 
+def count_model_parameters(hf_model_config: MStarT5Config):
+    """
+    Given a config, instantiate a model full of empty 
+    tensors and count the parameters 
+    """
+    with init_empty_weights():
+        model = MStarT5ForConditionalGeneration(config=hf_model_config)
+        num_params = sum([x.numel() for x in model.parameters()])/1000000000
+
+    return num_params
 
 def load_model(
     model_config,

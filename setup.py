@@ -84,6 +84,7 @@ rlfh_require = [
 pile_require = ["numpy", "pyarrow==8.0.0", "smart-open[s3]", "zstandard==0.18"]
 
 bedrock_encoder_decoder_tests_require = [
+    "deepspeed",
     "hydra-core>=1.2",
     "transformers>=4.20",
     "datasets>=2.0.0",
