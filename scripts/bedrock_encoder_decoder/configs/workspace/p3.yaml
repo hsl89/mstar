@@ -1,4 +1,0 @@
-name: "colehawk-bdrk-p3"
-node_type: "p3dn.24xlarge"
-node_num: 1
-image: 747303060528.dkr.ecr.us-west-2.amazonaws.com/mstar-eks:colehawk-bedrock_dev

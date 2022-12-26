@@ -1,0 +1,42 @@
+seed: 1234
+max_steps: 100
+
+online_packed_dataset:
+    _target_: data.online_packing.OnlinePackedDataset
+    hf_dataset: null #will be overridden
+    data_collator: null #will be overridden
+    tokenizer: null #will be overridden
+    max_tokens_per_example: 5000
+    base_seed: ${seed}
+    partition: "train"
+    process_global_rank: 0
+    detokenize: True
+
+download_data_fn:
+    _target_: mstar.utils.hf_utils._check_folder_exist
+    bucket_name: "mstar-data"
+    remote_folder_name: "tests"
+    local_folder: "/tmp"
+    download: True
+
+tokenizer:
+    _target_: mstar.AutoTokenizer.from_pretrained
+    pretrained_model_name_or_path: "t5-base"
+    max_tokenization_length: 10000
+
+#need to be downloaded from s3 to end up here
+training_datasets: [
+    '${download_data_fn.local_folder}/${download_data_fn.remote_folder_name}/pile_val_100_example_subset.arrow'
+]
+
+#used for saving and loading tests
+load_save:
+    save_iter: 5
+    test_iter: 1000
+    state_dict_path: '/tmp/dataloader.pt'
+
+#used to determine shard info of datasets
+sharding:
+    num_shards: 10
+    index: 7 
+             

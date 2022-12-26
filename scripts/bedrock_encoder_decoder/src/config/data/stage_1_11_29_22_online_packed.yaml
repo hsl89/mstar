@@ -1,0 +1,25 @@
+num_workers: 8
+collator_output_targets: t5
+max_seq_length: 2048
+max_output_length: 512
+mean_noise_span: 3.0
+mlm_prob: 0.1665
+training_datasets: [
+    '/mnt/pretraining-data/package-11-25-22-v1/val.arrow',
+    '/mnt/pretraining-data/package-11-25-22-v1/val.arrow'
+    #'/mnt/pretraining-data/package-11-25-22-v1/train1.arrow',
+    #'/mnt/pretraining-data/package-11-25-22-v1/train2.arrow',
+    #'/mnt/pretraining-data/package-11-25-22-v1/train3.arrow',
+    #'/mnt/pretraining-data/package-11-25-22-v1/train4.arrow',
+    #'/mnt/pretraining-data/package-11-25-22-v1/train5.arrow',
+    #'/mnt/pretraining-data/package-11-25-22-v1/train6.arrow',
+    #'/mnt/pretraining-data/package-11-25-22-v1/train7.arrow',
+    #'/mnt/pretraining-data/package-11-25-22-v1/train8.arrow',
+    #'/mnt/pretraining-data/package-11-25-22-v1/train9.arrow'
+]
+validation_datasets: [
+    '/mnt/pretraining-data/package-11-25-22-v1/val.arrow'
+]
+source: 'online_packed'
+max_tokens_per_example: 3100
+detokenize: 1

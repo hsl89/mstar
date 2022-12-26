@@ -179,7 +179,6 @@ def main(cfg):
                 val_loss_names=VAL_LOSS_NAMES
             )
 
-
     else:
         model_module = hydra.utils.instantiate(
                 cfg.lightning.model_module,
@@ -192,16 +191,34 @@ def main(cfg):
 
         #since we shard in the datamodule, don't let PTL re-shard
         assert cfg.trainer.replace_sampler_ddp is False
-        data_module = data.datamodule.HFDataModule(
-                tokenizer=tokenizer,
-                training_datasets=cfg.data.training_datasets,
-                validation_datasets=cfg.data.validation_datasets,
-                seed=cfg.optimization.seed,
-                micro_batch_size=cfg.optimization.micro_batch_size,
-                data_args=cfg.data,
-                data_collator=collator,
-                py_logger=logger,
-        )
+
+        if cfg.data.source=="online_packed":
+            logger.info("Using online packed data")
+            data_module = data.datamodule.OnlineHFDataModule(
+                    tokenizer=tokenizer,
+                    training_datasets=cfg.data.training_datasets,
+                    validation_datasets=cfg.data.validation_datasets,
+                    seed=cfg.optimization.seed,
+                    micro_batch_size=cfg.optimization.micro_batch_size,
+                    data_args=cfg.data,
+                    data_collator=collator,
+                    py_logger=logger,
+            )
+
+        elif cfg.data.source=="offline_packed":
+            logger.info("Using offline packed data")
+            data_module = data.datamodule.HFDataModule(
+                    tokenizer=tokenizer,
+                    training_datasets=cfg.data.training_datasets,
+                    validation_datasets=cfg.data.validation_datasets,
+                    seed=cfg.optimization.seed,
+                    micro_batch_size=cfg.optimization.micro_batch_size,
+                    data_args=cfg.data,
+                    data_collator=collator,
+                    py_logger=logger,
+            )
+        else:
+            raise NotImplementedError(f"Source {cfg.data.source} not implemented")
 
     # saving structure assumes deepspeed strategy
     assert isinstance(trainer.strategy, pl.strategies.DeepSpeedStrategy)

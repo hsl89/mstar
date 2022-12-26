@@ -1,0 +1,19 @@
+args:
+- pretrain_main.py
+- experiment_name=colehawk/verify_online_packing
+- data=stage_2_11_29_22.yaml
+- optimization.optimizer.lr=0.0005
+- optimization/scheduler=linear
+- run_name=offline_2B_stg_2_only
+- max_steps=20000
+- model=1_9B
+- lightning.callbacks.checkpoint.every_n_train_steps=5000
+- trainer.val_check_interval=5000
+- trainer.limit_val_batches=100
+- optimization.micro_batch_size=8
+command:
+- /usr/bin/python3
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-online-12-22
+name: offline-colehawk-2B-stg2-only
+node_num: 8
+node_type: p4d.24xlarge

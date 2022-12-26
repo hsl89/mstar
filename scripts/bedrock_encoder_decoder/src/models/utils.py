@@ -3,6 +3,7 @@ General utilities to accompany model creation
 """
 
 import deepspeed
+import mstar
 from mstar.models.t5 import MStarT5Config, MStarT5ForConditionalGeneration
 import torch as th
 import pytorch_lightning as pl

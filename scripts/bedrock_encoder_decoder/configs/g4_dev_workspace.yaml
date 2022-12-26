@@ -1,5 +1,0 @@
-name: "colehawk-g4-dev"
-node_type: "g4dn.12xlarge"
-node_num: 1
-gpu: 4
-image: 747303060528.dkr.ecr.REGION_TAG.amazonaws.com/mstar-eks:USER_TAG-NAME_TAG

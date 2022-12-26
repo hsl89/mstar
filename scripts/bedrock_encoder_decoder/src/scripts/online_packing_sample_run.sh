@@ -6,10 +6,10 @@ LIMIT_VAL_BATCHES=10
 WARMUP_STEPS=100
 MICRO_BATCH_SIZE=2 #per-device batch size
 
-NUM_WORKERS=32
+NUM_WORKERS=1
 PREFETCH_FACTOR=4
 
-NAME="worker_${NUM_WORKERS}_prefetch_${PREFETCH_FACTOR}_offline_2b"
+NAME="worker_${NUM_WORKERS}_prefetch_${PREFETCH_FACTOR}_online_2b"
 
 python3 pretrain_main.py \
     trainer.reload_dataloaders_every_n_epochs=0 \
@@ -28,5 +28,5 @@ python3 pretrain_main.py \
     optimization.scheduler.num_warmup_steps=${WARMUP_STEPS} \
     optimization.scheduler.scale_factor=${WARMUP_STEPS} \
     trainer.num_sanity_val_steps=0 \
-    data=stage_2_11_29_22 \
+    data=online_pack_tmp \
     tokenizer.pretrained_model_name_or_path=/mnt/tokenizer/mstar-t5-20B-bedrock-stage_2_t5_600B_embed_fix-nfkc \

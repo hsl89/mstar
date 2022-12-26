@@ -1,4 +1,0 @@
-name: "colehawk-bdrk-g5-bf16"
-node_type: "g5.48xlarge"
-node_num: 1
-image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock_new_dev
