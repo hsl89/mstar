@@ -1,8 +1,10 @@
 """
-Collator for T5-style MLM. Modified from
+Collator for T5-style MLM. 
+Modified from
 https://github.com/huggingface/transformers/blob/c85547af2b69f9082bcd7bac97092b1d162f3fdc/examples/flax/language-modeling/run_t5_mlm_flax.py#L279
 """
 import warnings
+import time
 import torch
 import sys
 from dataclasses import asdict, dataclass, field
@@ -12,6 +14,8 @@ import transformers
 import random
 from transformers import AutoTokenizer, BatchEncoding, PreTrainedTokenizerBase
 import logging
+#local import
+import collators.utils
 
 logger = logging.getLogger(__name__)
 
@@ -638,6 +642,10 @@ class Seq2SeqMixDenoisingCollator(transformers.DataCollatorForSeq2Seq):
                     batch[key][i] = batch[key][i][0:3] + batch[key][i][extra + 3 :]
 
 
+# TODO(@colehawk) generalize this to N data collators
+# TODO(@colehawk) remove transformers datacollator inheritance
+# transformers datacollator inherits from dataclass 
+# which has negative interaction with hydra
 class MixedT5DataCollatorForSpanCorruption(transformers.DataCollatorForSeq2Seq):
 
     """
@@ -708,115 +716,79 @@ class MixedT5DataCollatorForSpanCorruption(transformers.DataCollatorForSeq2Seq):
             clm_max_doc=clm_max_doc,
         )
 
+        #TODO(@colehawk) take random seed from config
+        #TODO(@colehawk) include random state+seed in state dict
+        #TODO(@colehawk) test for determinism upon resume
+        self.random_seed = int(str(time.monotonic())[-3:])
+        if torch.distributed.is_initialized():
+            self.random_seed = self.random_state*torch.distributed.get_rank()    
+        
+        self.random_state  = np.random.RandomState(self.random_seed)       
+
     def __call__(
-        self, batch, return_type="pt", testing: bool = False
+        self, batch: List[str], return_type="pt", testing: bool = False
     ) -> Dict[str, np.ndarray]:
         # batch is a list with length batch_size and entries are strings
 
         # return each collator values in numpy, then possibly convert to 'pt' at end
         INTERMEDIATE_RETURN_TYPE = "np"
 
-        assert (
-            self.clm_ratio == 0.5
-        ), "Easy to extend, but this was faster since we can split the batch size"
-        # where to split batch
-        split_position = len(batch) // 2
-
-        # in case examples are not shuffled by dataloader
+        # split examples with index based on random state
+        split_position = self.random_state.binomial(len(batch),self.clm_ratio)
+        # shuffle in case examples are not shuffled by dataloader
         random.shuffle(batch)
-
         clm_examples = batch[:split_position]
         t5_examples = batch[split_position:]
+        # collate both independently, since they may not get any examples
+        if t5_examples:
+            t5_batch = self.t5_data_collator(
+                batch=t5_examples, return_type=INTERMEDIATE_RETURN_TYPE
+            )  
+        if clm_examples:
+            clm_batch = self.clm_data_collator(
+                examples=clm_examples, return_type=INTERMEDIATE_RETURN_TYPE
+            )
 
-        # split batch
+        # concatenate batch elements if necessary
+        if clm_examples and t5_examples:
+            # we used both collators, and clm collator will have extra keys
+            assert clm_batch != {}, "CLM Batch empty"
+            try:
+                clm_batch.pop("attention_mask")
+            except KeyError as e:
+                logging.warning("CLM batch did not have key attention mask")
+            batch = collators.utils.pad_and_concatenate_batches([t5_batch,clm_batch], self.tokenizer.pad_token_id)
 
-        t5_batch = self.t5_data_collator(
-            batch=t5_examples, return_type=INTERMEDIATE_RETURN_TYPE
-        )  # INTERMEDIATE_RETURN_TYPE)
+        elif clm_examples:
+            batch = clm_batch
+        elif t5_examples:
+            batch = t5_batch
+        else:
+            raise ValueError("No batch produced")
 
-        # don't truncate t5 targets, assumes T5 output length is shorter and will be extended to match CLM output length
-        assert (
-            t5_batch["labels"].shape[1] < self.clm_data_collator.max_output_length
-        ), "Don't truncate T5 loss labels, increase CLM output length"
-
-        clm_batch = self.clm_data_collator(
-            examples=clm_examples, return_type=INTERMEDIATE_RETURN_TYPE
+        # mask out pad tokens from attn computation
+        batch["attention_mask"] = np.where(
+            batch["input_ids"] == self.tokenizer.pad_token_id, 0, 1
         )
 
-        if clm_batch == {}:
-            # no examples meet length cutoff, empty dict
-            batch = {}
+        # mask pad tokens from loss computation
+        batch["labels"] = np.where(
+            batch["labels"] == self.tokenizer.pad_token_id, -100, batch["labels"]
+        )
 
-            batch["input_ids"] = t5_batch["input_ids"]
-            # re-does clm attention mask, but not a major timing concern
-            batch["attention_mask"] = np.where(
-                batch["input_ids"] == self.tokenizer.pad_token_id, 0, 1
-            )
+        # skip decoder mask since decoder starts with pad token id by convention
+        # causal masking means we would only worry about mid-sample pad tokens
+        batch["decoder_input_ids"] = shift_tokens_right(
+            batch["labels"],
+            self.tokenizer.pad_token_id,
+            self.decoder_start_token_id,
+        )
 
-            padded_t5_labels = np.pad(
-                t5_batch["labels"],
-                [(0, 0), (0, self.clm_max_output_length - t5_batch["labels"].shape[1])],
-                mode="constant",
-                constant_values=self.tokenizer.pad_token_id,
-            )
+        if return_type == "pt":
+            for key, val in batch.items():
+                batch[key] = torch.tensor(val, dtype=torch.long)
 
-            batch["labels"] = padded_t5_labels
-            batch["labels"] = np.where(
-                batch["labels"] == self.tokenizer.pad_token_id, -100, batch["labels"]
-            )
-            # ok to just repeat the shift, though this effort could be saved
-            batch["decoder_input_ids"] = shift_tokens_right(
-                batch["labels"],
-                self.tokenizer.pad_token_id,
-                self.decoder_start_token_id,
-            )
-
-            if return_type == "pt":
-                for key, val in batch.items():
-                    batch[key] = torch.tensor(val, dtype=torch.long)
-
-            return batch
-
-        else:
-            batch = {}
-
-            batch["input_ids"] = np.concatenate(
-                [t5_batch["input_ids"], clm_batch["input_ids"]], axis=0
-            )
-            # re-does clm attention mask, but not a major timing concern
-            batch["attention_mask"] = np.where(
-                batch["input_ids"] == self.tokenizer.pad_token_id, 0, 1
-            )
-
-            padded_t5_labels = np.pad(
-                t5_batch["labels"],
-                [(0, 0), (0, self.clm_max_output_length - t5_batch["labels"].shape[1])],
-                mode="constant",
-                constant_values=self.tokenizer.pad_token_id,
-            )
-
-            # print(t5_batch["labels"].shape)
-            # print(padded_t5_labels.shape)
-            # print(clm_batch["labels"].shape)
-
-            batch["labels"] = np.concatenate(
-                [padded_t5_labels, clm_batch["labels"]], axis=0
-            )
-            batch["labels"] = np.where(
-                batch["labels"] == self.tokenizer.pad_token_id, -100, batch["labels"]
-            )
-            # ok to just repeat the shift, though this effort could be saved
-            batch["decoder_input_ids"] = shift_tokens_right(
-                batch["labels"],
-                self.tokenizer.pad_token_id,
-                self.decoder_start_token_id,
-            )
-
-            if return_type == "pt":
-                for key, val in batch.items():
-                    batch[key] = torch.tensor(val, dtype=torch.long)
-
-            return batch
+        return batch
 
 
 class CLMCollator(transformers.DataCollatorForSeq2Seq):
@@ -865,9 +837,16 @@ class CLMCollator(transformers.DataCollatorForSeq2Seq):
         if self.clm_max_doc != -1:
             split_clm_examples = split_clm_examples[: self.clm_max_doc]
 
-        # no examples pass, return empty dict
+        # no examples to pass, return fake batch
         if len(split_clm_examples) == 0:
-            return {}
+            #don't return empty batch
+            fake_batch = {
+                "input_ids":self.tokenizer.pad_token_id*np.ones([1,self.max_input_length]),
+                "labels": self.tokenizer.pad_token_id*np.ones([1,self.max_output_length]),
+                "decoder_input_ids":self.tokenizer.pad_token_id*np.ones([1,self.max_output_length]),
+            }
+            return fake_batch
+
 
         # left truncation for max input length done later
         # left truncation because this is a CLM input
@@ -963,6 +942,7 @@ class CLMCollator(transformers.DataCollatorForSeq2Seq):
         if return_type == "pt":
             for key, val in batch.items():
                 batch[key] = torch.tensor(val, dtype=torch.long)
+
         return batch
 
     @staticmethod
@@ -979,27 +959,28 @@ class CLMCollator(transformers.DataCollatorForSeq2Seq):
         """
         Split input example into a tuple (input, output)
         """
-        # print(type(example))
-        # print(example)
-        # raise ValueError
-        tokens = example.split()
-        # alexaTM comments below
-        # originally 0.2 to 0.8 for 20B
-        random_split = np.random.uniform(input_min_ratio, input_max_ratio)
-        l = int(len(tokens) * random_split)
-        # add clm token to signal to the model to do CLM
-        if l == 0:
-            return clm_token, " ".join(tokens[l:])
+        total_chars = len(example)
+
+        # find first space to the left of splitting point
+        random_split_approx_index = int(total_chars * np.random.uniform(input_min_ratio, input_max_ratio))
+        random_split_index = example[:random_split_approx_index].rfind(' ') 
+
+        # l==-1 if str.rfind does not find any spaces
+        # use same behavior for no spaces and start on space
+        random_split_index = max(random_split_index,0)
+
+        # add clm_token to signal to the model to do CLM
+        if random_split_index == 0:
+            #full example goes to the decoder
+            return clm_token, example
         else:
-            return clm_token + " " + " ".join(tokens[:l]), " ".join(tokens[l:])
+            #don't want to always generate a space, so use l+1
+            return clm_token + " " + example[:random_split_index], example[random_split_index+1:]
 
     def _truncate_from_left(self, batch):
-        # print(batch)#["input_ids"])
-        # raise ValueError
         for i in range(len(batch["input_ids"])):
             if len(batch["input_ids"][i]) > self.max_input_length:
                 extra = len(batch["input_ids"][i]) - self.max_input_length
                 for key in batch.keys():
                     # make sure don't cut <s>, _, and clm_token
-                    # print(batch[key][i][extra + 3:])
                     batch[key][i] = batch[key][i][0:3] + batch[key][i][extra + 3 :]

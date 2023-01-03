@@ -28,21 +28,18 @@ import torch.nn as nn
 
 warnings.simplefilter("ignore")
 NUM_REPEATS = 10
-BATCH_SIZE = 4
+BATCH_SIZE = 8
 MAX_STEPS = 5
 MLM_PROB = 0.1665
 MEAN_NOISE_SPAN = 3.0
 EVAL_ONLY = False
 MAX_LENGTH = 2048  # 2048#MAX_SEQ_LENGTH #2048
-CLM_MAX_DOC = 2
-CLM_MIX_RATIO = 0.25
 CUTOFF = 256
 TRAIN_DATA_PATH = (
-    "/mnt/pretraining-data/package-09-22-22-v1/train1_packed_chunksize_2600.arrow"
+    "/mnt/pretraining-data/package-11-25-22-v4/val_packed_chunksize_5000.arrow"
 )
-CLM_RATIO = 0.5
-INDICES = [91021, 10003, 9299, 791912]  # ,918121,97112,112189,11017]
-INDICES = [918121, 97112, 112189, 11017]
+CLM_RATIO = 1.0
+INDICES = [21, 10003, 9299, 791,121, 97112, 112, 11017]
 assert len(INDICES) == BATCH_SIZE
 import numpy as np
 
@@ -73,49 +70,16 @@ assert len(INDICES) == BATCH_SIZE
 # https://issues.apache.org/jira/browse/ARROW-11989
 
 model = transformers.T5ForConditionalGeneration.from_pretrained("t5-small")
-# 2113 to match bedrock
-tokenizer = transformers.AutoTokenizer.from_pretrained("t5-small", extra_ids=2113)
+import mstar.AutoTokenizer
+tokenizer = mstar.AutoTokenizer.from_pretrained('/mnt/tokenizer/mstar-t5-20B-bedrock-stage_2_t5_600B_embed_fix-nfkc/')
 
 model.resize_token_embeddings(len(tokenizer))
 config = transformers.AutoConfig.from_pretrained("t5-base")
 
 import t5_collator
 
-
-"""
-import alexa_tm
-
-data_collator = alexa_tm.Seq2SeqMixDenoisingCollator(
-            tokenizer=tokenizer,
-            mask_fraction=MLM_PROB,
-            max_length=MAX_LENGTH,#expanded_inputs_length,
-            mix_ratio=CLM_MIX_RATIO,
-            clm_max_doc=CLM_MAX_DOC,
-            device='cuda')
-data_collator = t5_collator.Seq2SeqMixDenoisingCollator(
-            tokenizer=tokenizer,
-            max_length=MAX_LENGTH,#expanded_inputs_length,
-            pad_token_id=tokenizer.pad_token_id,
-            decoder_start_token_id=config.decoder_start_token_id,
-            noise_density=0.155,#MLM_PROB
-            mean_noise_span_length=MEAN_NOISE_SPAN,
-            mix_ratio=CLM_MIX_RATIO,
-            clm_max_doc=CLM_MAX_DOC,            
-            keep_sentinel_ids=False)
-
-
-data_collator = t5_collator.CLMCollator(
-            tokenizer=tokenizer,
-            max_input_length=MAX_INPUT_LENGTH,
-            max_output_length=MAX_OUTPUT_LENGTH,
-            decoder_start_token_id=config.decoder_start_token_id,
-            clm_token="<extra_id_0>",
-            clm_min_split_ratio=0.2,
-            clm_max_split_ratio=0.8,
-)
-"""
-MAX_INPUT_LENGTH = 256  # 2048
-MAX_OUTPUT_LENGTH = 128  # 1024
+MAX_INPUT_LENGTH = 1024  # 2048
+MAX_OUTPUT_LENGTH = 512  # 1024
 
 expanded_inputs_length, target_length = t5_collator.compute_input_and_target_lengths(
     inputs_length=MAX_INPUT_LENGTH,
@@ -123,7 +87,6 @@ expanded_inputs_length, target_length = t5_collator.compute_input_and_target_len
     mean_noise_span_length=MEAN_NOISE_SPAN,
 )
 
-print("Inputs lengths", expanded_inputs_length, target_length)
 data_collator = t5_collator.MixedT5DataCollatorForSpanCorruption(
     tokenizer=tokenizer,
     noise_density=MLM_PROB,
@@ -135,14 +98,11 @@ data_collator = t5_collator.MixedT5DataCollatorForSpanCorruption(
     decoder_start_token_id=config.decoder_start_token_id,
     clm_ratio=CLM_RATIO,
     clm_max_output_length=MAX_OUTPUT_LENGTH,
+    clm_max_doc=max(int(CLM_RATIO*BATCH_SIZE),1),
 )
 
 batch = [x for x in batch]
 
-# 0.2498, leave out sentinel ids
-# 0.2498, keep in sentinel ids
-
-batch = [x for x in batch]
 print("Setup")
 import time
 
