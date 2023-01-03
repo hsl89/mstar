@@ -83,8 +83,10 @@ rlfh_require = [
 
 pile_require = ["numpy", "pyarrow==8.0.0", "smart-open[s3]", "zstandard==0.18"]
 
-bedrock_encoder_decoder_tests_require = [
+bedrock_encoder_decoder_require = [
     "deepspeed",
+    "python-etcd==0.4.5",#for auto-restart
+    "pytorch_lightning>=1.8.6",
     "hydra-core>=1.2",
     "transformers>=4.20",
     "datasets>=2.0.0",
@@ -97,7 +99,7 @@ extras = {
     "test": tests_require,
     "rlfh": rlfh_require,
     "pile": pile_require,
-    "bedrock_encoder_decoder_tests": bedrock_encoder_decoder_tests_require,
+    "bedrock_encoder_decoder": bedrock_encoder_decoder_require,
 }
 
 force_cuda = os.getenv("FORCE_CUDA", "0") == "1"
@@ -198,7 +200,7 @@ setup(
     tests_require=tests_require,
     rlfh_require=rlfh_require,
     pile_require=pile_require,
-    bedrock_encoder_decoder_tests_require=bedrock_encoder_decoder_tests_require,
+    bedrock_encoder_decoder_require=bedrock_encoder_decoder_require,
     extras_require=extras,
     ext_modules=extensions,
     cmdclass=cmdclass,

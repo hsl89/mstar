@@ -8,13 +8,13 @@ import yaml
 import logging
 import os
 import sys
+import mstar
 import mstar.models.t5
 from mstar.utils.lightning import KubeFlowEnvironment, MStarEKSLogger
 import torch as th
 import pytorch_lightning as pl
 import deepspeed
 import omegaconf
-
 # local imports
 import models
 import data
@@ -27,7 +27,12 @@ def main(cfg):
     """
     Launch pretraining
     """
+
+    #used for logging later, avoid instantiation
+    cfg_as_primitive=omegaconf.OmegaConf.to_container(cfg)
+
     #resolve config and interpolate values now
+    #TODO(@colehawk) this instantiates some values too early
     #otherwise issues later with instantiation
     omegaconf.OmegaConf.resolve(cfg)
 
@@ -41,6 +46,20 @@ def main(cfg):
 
     logger.info("Configuration args")
     logger.info(cfg)
+            
+
+    #use this to ensure that all checkpoints have same naming
+    #otherwise, first checkpoint is saved before validation and 
+    #has different naming convention
+    
+
+    if cfg.model.ckpt_path:
+        if cfg.model.ckpt_path=="auto":
+            #will either return most recent checkpoint or None if no ckpt present
+            cfg.model.ckpt_path = utils.auto_restart.latest_ckpt_wrapper_from_cfg(cfg)
+
+            logger.info(f"Resuming from checkpoint to {cfg.model.ckpt_path}. None indicates restarting training")
+
     # If dataloader is already multiprocessing, skip this
     if cfg.data.num_workers > 0:
         os.environ["TOKENIZERS_PARALLELISM"] = "False"
@@ -67,6 +86,10 @@ def main(cfg):
     # uses custom config class for extra args
     hf_model_config = mstar.models.t5.MStarT5Config(**cfg.model)
 
+    # validates config for general compataiblity 
+    # with traning assumptions
+    utils.config.validate_config(cfg, hf_model_config)
+
     collator = collators.solver.get_collator(
         data_args=cfg.data,
         tokenizer=tokenizer,
@@ -76,36 +99,17 @@ def main(cfg):
     # make sure that model has enough embeddings for the tokenizer
     assert hf_model_config.vocab_size >= len(tokenizer), f"Model vocab size {hf_model_config.vocab_size} too small for tokenizer vocab size {len(tokenizer)}"
 
-    if cfg.model.fused_scaled_masked_softmax:
-        #make sure trainer/softmax precision match
-        if cfg.trainer.precision==16:
-            #16=fp16 for pytorch lightning
-            assert hf_model_config.softmax_precision=="fp16", f"Trainer precision {cfg.trainer.precision} should match softmax precision {hf_model_config.softmax_precision}"
-        elif cfg.trainer.precision=="bf16":
-            assert hf_model_config.softmax_precision=="bf16", f"Trainer precision {cfg.trainer.precision} should match softmax precision {hf_model_config.softmax_precision}"
-        else:
-            raise ValueError(f"Trainer precision {cfg.trainer.precision} does not match any softmax precision")
+    plugins = [hydra.utils.instantiate(cfg.lightning.plugins.environment)]
 
-    plugins = [KubeFlowEnvironment(master_port=23456)]
-
-    # assumes EKS cluster usage
-    mstar_logger = MStarEKSLogger(
-        experiment_name=cfg.experiment_name,
-        run_name=cfg.run_name,
-        tags={"mode": "Training"},
-        s3_upload=False,  #slows down large model training
-    )
+    trainer_logger = hydra.utils.instantiate(cfg.lightning.logger)
 
     save_dir_path = utils.logging.get_save_dir(cfg)
 
     # strategy determines distributed training
-    # required to use deepspeed config json
-    # used for optimized Zero-2D internal version
-    strategy = pl.strategies.DeepSpeedStrategy(
-        config=cfg.deepspeed_path,
-        remote_device=None,  # Initialize directly on GPUs instead of CPU (ZeRO-3)
-    )
-
+    # deepspeed strategy requires PTL plugin augmentation
+    # to run with zero-2d and internal deepspeed config
+    strategy = hydra.utils.instantiate(cfg.lightning.strategy)
+    
     #TODO(colehawk) move to hydra instantiation of list as well
     callbacks = [
         hydra.utils.instantiate(cfg.lightning.callbacks.checkpoint,dirpath=save_dir_path),
@@ -119,11 +123,10 @@ def main(cfg):
         callbacks=callbacks,
         plugins=plugins,
         strategy=strategy,
-        logger=mstar_logger,
+        logger=trainer_logger,
     )
  
     assert len(list(filter(None,[cfg.model.state_dict_path,cfg.model.ckpt_path])))<=1, "Resume from either cfg.model.state_dict_path or cfg.model.ckpt_path not both"
-
     model_init_fn = lambda : models.utils.load_model(
         trainer=trainer,
         precision=cfg.trainer.precision, 
@@ -169,7 +172,7 @@ def main(cfg):
         model_module = hydra.utils.instantiate(
                 cfg.lightning.model_module,
                 _recursive_=False, #otherwise hydra tries to instantiate the full config
-                full_experiment_config=cfg,
+                full_experiment_config=cfg_as_primitive,
                 model_init_fn=model_init_fn,
                 py_logger=logger,
                 optimizer_cfg=cfg.optimization,
@@ -227,12 +230,6 @@ def main(cfg):
     data_module.setup()
 
 
-    if cfg.model.ckpt_path:
-        if cfg.model.ckpt_path=="auto":
-            import fake_auto_restart
-            cfg.model.ckpt_path = fake_auto_restart.latest_ckpt_wrapper_from_cfg(cfg)
-
-        logger.info(f"Resuming from checkpoint to {cfg.model.ckpt_path}")
 
     if not getattr(cfg, "validate_only", False):
         logger.info("*********** start training ***********\n\n")

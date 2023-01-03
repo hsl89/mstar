@@ -78,24 +78,24 @@ def load_model(
     context = contextlib.nullcontext()
     zero_stage_3 = (
         isinstance(
-            trainer.training_type_plugin,
-            pl.plugins.training_type.deepspeed.DeepSpeedPlugin,
+            trainer.strategy,
+            pl.strategies.DeepSpeedStrategy,
         )
-        and trainer.training_type_plugin.zero_stage_3
+        and trainer.strategy.zero_stage_3
         and not meta_context
     )
     if zero_stage_3:
-        if trainer.training_type_plugin.precision in (16, "mixed"):
+        if trainer.strategy.precision_plugin.precision in (16, "mixed"):
             dtype = th.float16
-        elif trainer.training_type_plugin.precision == "bf16":
+        elif trainer.strategy.precision_plugin.precision== "bf16":
             dtype = th.bfloat16
         else:
             dtype = th.float32
 
         context = deepspeed.zero.Init(
-            remote_device=trainer.training_type_plugin.remote_device,
+            remote_device=trainer.strategy.remote_device,
             pin_memory=True,
-            config=trainer.training_type_plugin.config,
+            config=trainer.strategy.config,
             dtype=dtype,
         )
 

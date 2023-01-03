@@ -57,7 +57,7 @@ class PlModel(pl.LightningModule):
 
     def __init__(
         self,
-        full_experiment_config, #to log parameters
+        full_experiment_config, #to log parameters, should be nested dicts
         model_init_fn,
         py_logger,
         optimizer_cfg,
@@ -154,7 +154,7 @@ class PlModel(pl.LightningModule):
         #override the lambda schedulers
         #default configs do not adjust the schedulers 
         self.lr_schedulers().lr_lambdas = [
-                lambda x: self.full_experiment_config.optimization.override.mult_factor * fn(x+self.full_experiment_config.optimization.override.add_index)
+                lambda x: self.optimizer_cfg.override.mult_factor * fn(x+self.optimizer_cfg.override.add_index)
                 for fn in self.lr_schedulers().lr_lambdas
         ]
 
@@ -178,9 +178,10 @@ class PlModel(pl.LightningModule):
 
     def configure_optimizers(self):
         
-        #log here since it occurs after ddp launches
-        self.logger.log_hyperparams(self.full_experiment_config)
-
+        #hyperparameter logging needs to occur after ddp launch
+        #inside config_optimizers since this occurs after ddp launch
+        #use trainer logger which ensures it is mstar logger
+        self.trainer.logger.log_hyperparams(self.full_experiment_config)
 
         # create the optimizer, exclude "bias", "LayerNorm" from decaying
         decay_parameters = get_parameter_names(self.model, [th.nn.LayerNorm])
@@ -212,9 +213,9 @@ class PlModel(pl.LightningModule):
 
         #need convert="partial" to avoid hydra converting 
         #param_groups into an OmegaConf, which breaks optimizer creation 
-        optimizer = hydra.utils.instantiate(self.full_experiment_config.optimization.optimizer, _convert_="partial", params=param_groups)
+        optimizer = hydra.utils.instantiate(self.optimizer_cfg.optimizer, _convert_="partial", params=param_groups)
 
-        scheduler = hydra.utils.call(self.full_experiment_config.optimization.scheduler, optimizer=optimizer)
+        scheduler = hydra.utils.call(self.optimizer_cfg.scheduler, optimizer=optimizer)
         return (
             [optimizer],
             [

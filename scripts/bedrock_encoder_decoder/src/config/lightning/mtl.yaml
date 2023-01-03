@@ -3,4 +3,7 @@ defaults:
     - model_module: mtl 
     - data_module: mtl
     - callbacks: mtl
+    - logger: mstar
+    - strategy: deepspeed
+    - plugins: base
 

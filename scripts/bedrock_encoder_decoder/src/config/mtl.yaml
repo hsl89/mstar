@@ -6,6 +6,7 @@ defaults:
     - model: base
     - tokenizer: base
     - lightning: mtl 
+    - autorestart: base
 
 run_name: 1_9B
 experiment_name: easel_mix_pile_p3 

@@ -11,7 +11,6 @@ gradient_clip_val: 1.0
 limit_train_batches: null
 limit_val_batches: null
 log_every_n_steps: 10
-log_gpu_memory: null
 max_epochs: null
 max_steps: ${..max_steps} #get value via interpolation
 num_sanity_val_steps: 0 #since we use zero-2d, better default
@@ -19,7 +18,7 @@ precision: bf16
 reload_dataloaders_every_n_epochs: 1 #fine for mmap arrow files
 replace_sampler_ddp: false #necessary since we maange the sampler
 track_grad_norm: -1
-val_check_interval: 5000
+val_check_interval: null #leave null, will be set to occur 1 step before checkpointing
 
 #Placeholders for hydra instantiation
 #callbacks: null

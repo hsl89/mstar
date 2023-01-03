@@ -3,3 +3,6 @@ defaults:
     - model_module: base
     - data_module: base
     - callbacks: base
+    - logger: mstar
+    - strategy: deepspeed
+    - plugins: base

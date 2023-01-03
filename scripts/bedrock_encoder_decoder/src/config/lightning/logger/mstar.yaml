@@ -1,0 +1,6 @@
+_target_: utils.logging.MyMStarEKSLogger
+experiment_name: ${...experiment_name}
+tags: {"mode":"Training"}
+s3_upload: False
+run_name: ${...run_name}
+

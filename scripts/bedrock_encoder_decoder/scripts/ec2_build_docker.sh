@@ -16,7 +16,7 @@ aws ecr get-login-password --region us-east-2 | sudo docker login --username AWS
 #build docker file from parent directory of mstar
 cd ../../..
 echo $TAG
-DOCKER_BUILDKIT=1 sudo docker build -t $TAG -f $DOCKERFILE_PATH .
+DOCKER_BUILDKIT=1 sudo docker build --no-cache -t $TAG -f $DOCKERFILE_PATH . 
 
 #to avoid credential overlap for different ecr repos
 sudo docker logout

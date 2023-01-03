@@ -1,9 +1,1 @@
-hydra-core>=1.2
-transformers>=4.20
-datasets>=2.0.0
-tqdm>=4.64.0
-git+https://github.com/leezu/metrics@workaround-484#egg=torchmetrics
 https://github.com/leezu/apex/tarball/fc7a3a9bd4e7c5295ca1eca05da83e7a16686087
-git+https://github.com/barry-jin/pytorch-lightning@release/1.6.5#egg=pytorch-lightning
-ninja>=1.10.2
-s3fs>=2022.3.0

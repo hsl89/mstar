@@ -13,9 +13,6 @@ def filter_out_by_keyword(to_filter, keywords):
 
 def get_candidate_checkpoint_paths(base_filepath):
     return [x.split("checkpoint")[0] for x in glob.glob(f'{base_filepath}/**/*/checkpoint/')]
-    
-
-
 
 def get_folder_timestamp_from_file(folder):
     """Given a checkpoint folder, use a specified file 
@@ -48,11 +45,15 @@ def get_most_recent_checkpoint(base_filepath, filter_keywords=None):
 
     candidate_checkpoints_with_timestamps = [{"folder":x,"timestamp":get_folder_timestamp_from_file(x)} for x in candidate_checkpoints]   
 
-    #sort by timestamp, get most recent
-    sorted_candidate_checkpoints = sorted(candidate_checkpoints_with_timestamps, key = lambda x:x["timestamp"])
-    selected_checkpoint = sorted_candidate_checkpoints[-1]["folder"]
+    if candidate_checkpoints_with_timestamps:
+        #sort by timestamp, get most recent
+        sorted_candidate_checkpoints = sorted(candidate_checkpoints_with_timestamps, key = lambda x:x["timestamp"])
+        selected_checkpoint = sorted_candidate_checkpoints[-1]["folder"] 
 
-    logger.info(f"Selecting checkpoint {selected_checkpoint} based on timestamp recency")
+        logger.info(f"Selecting checkpoint {selected_checkpoint} based on timestamp recency")
+    else:
+        selected_checkpoint=None
+        logger.warning(f"No checkpoint detected, returning None")
 
     return selected_checkpoint 
     
@@ -61,9 +62,9 @@ def latest_ckpt_wrapper_from_cfg(cfg):
     base_filepath = os.path.join(cfg.trainer.default_root_dir,cfg.run_name)
     logger.info(f"Finding latest checkpoint in {base_filepath}")
 
-    if hasattr(cfg,"filter_keywords"):
-        logger.info("Filtering out checkpoints with keywords {filter_keywords}")    
-        filter_keywords = cfg.filter_keywords
+    if cfg.autorestart.filter_keywords:
+        logger.info("Filtering out checkpoints with keywords {cfg.autorestart.filter_keywords}") 
+        filter_keywords = cfg.autorestart.filter_keywords
     else:
         logger.info("Not filtering checkpoints by keyword")
         filter_keywords = None

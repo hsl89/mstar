@@ -84,11 +84,21 @@ class KubeFlowEnvironment(LightningEnvironment):
     def master_address(self) -> str:
         return os.environ["MASTER_ADDR"]
 
+    #needs to be property for PTL 1.8 
+    @property
+    def main_address(self) -> str:
+        return self.master_address()
+
     def master_port(self) -> int:
         if "MASTER_PORT" in os.environ:
             # Lightning may spawn processes and set MASTER_PORT in their env
             assert int(os.environ["MASTER_PORT"]) == self._master_port
         return self._master_port
+
+    #needs to be property for PTL 1.8 
+    @property
+    def main_port(self) -> int:
+        return self.master_port()
 
     def node_rank(self) -> int:
         return int(os.environ["RANK"])

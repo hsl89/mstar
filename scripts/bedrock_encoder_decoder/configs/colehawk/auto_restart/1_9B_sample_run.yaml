@@ -1,0 +1,26 @@
+args:
+- --nnodes=4
+- --nproc_per_node=8
+- --max_restarts=0
+- pretrain_main.py
+- lightning/plugins/environment=torch_elastic #necessary for elastic controller
+- run_name=test_autorestart_2B
+- model.ckpt_path="auto"
+- data=tmp
+- optimization.optimizer.lr=0.0005
+- optimization/scheduler=linear
+- max_steps=1000
+- model=1_9B
+- lightning.callbacks.checkpoint.every_n_train_steps=50
+- trainer.limit_val_batches=10
+- optimization.micro_batch_size=2
+command: ["python3","-m","torch.distributed.run"]
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-restart-12-30
+name: colehawk-test-elastic-S
+node_type: p4d.24xlarge
+dag_type: "elastic_job_dag" # elastic job dag type
+node_num: 4
+min_replica: 4 #as for now keep the min_replica, max_replica, updated_replica as same
+max_replica: 4
+updated_replica: 4
+max_dag_triggers: 1 # this parameter will trigger the restart of the dag if the launch job failed for some reason

@@ -1,0 +1,17 @@
+num_workers: 32
+prefetch_factor: 4
+clm_ratio: 0.5
+collator_output_targets: mixed_t5_clm
+max_seq_length: 2048
+max_output_length: 1024
+clm_max_output_length: 1024
+clm_max_doc: 4
+mean_noise_span: 3.0
+mlm_prob: 0.1665
+training_datasets: [
+    '/mnt/pretraining-data/package-11-25-22-v4/val_packed_chunksize_5000.arrow'
+]
+validation_datasets: [
+    '/mnt/pretraining-data/package-11-25-22-v4/val_packed_chunksize_5000.arrow'
+]
+source: 'offline_packed'

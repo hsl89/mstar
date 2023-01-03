@@ -61,6 +61,7 @@ class HFDataModule(pl.LightningDataModule):
         self.py_logger = py_logger
 
         if hasattr(data_args, "resume_index"):
+            # can be manually passed in, but usually accessed via ckpt load
             self.py_logger.info("Starting from resume dataset index")
 
             self.resume_index = data_args.resume_index * self.micro_batch_size
@@ -73,6 +74,9 @@ class HFDataModule(pl.LightningDataModule):
             check_arrow_for_single_chunk(filepath)
 
         self._data_collator = data_collator
+
+    def setup(self, stage=None):
+        pass
 
     def setup_train_hf_dataset(self):
         """
@@ -175,19 +179,22 @@ class HFDataModule(pl.LightningDataModule):
         self.val_hf_dataset = datasets.concatenate_datasets(val_datasets).shuffle(
             seed=self.seed
         )
-
-    def on_load_checkpoint(self, checkpoint):
-        self.py_logger.warning(
-            "Reloading method assumes that the previous batchsize was constant throughout training"
-        )
-        # how far to increment the dataloader
-        self.resume_index = (
-            checkpoint["loops"]["fit_loop"]["epoch_loop.batch_progress"]["total"][
-                "completed"
-            ]
-            * self.micro_batch_size
-        )
-
+  
+    
+    def state_dict(self):
+        """
+        Triggered on checkpoint save
+        Will not be copied on a per-worker basis
+        """
+        #get batch idx within one epoch
+        return {"batch_idx": self.trainer.fit_loop.epoch_loop.batch_idx, "micro_batch_size": self.micro_batch_size}
+        
+    def load_state_dict(self,state_dict):
+        """
+        Triggered on checkpoint load
+        """
+        self.resume_index = state_dict["batch_idx"] * state_dict["micro_batch_size"]
+ 
     def collate_fn(self, x):
         return self._data_collator([y["text"] for y in x])
 
@@ -203,7 +210,8 @@ class HFDataModule(pl.LightningDataModule):
         )
 
         if self.resume_index is not None:
-            # in case we are past the first epoch, need modulo
+            self.py_logger.info("Resuming dataloader from example {self.resume_index}")
+            # in case we are past the first epoch, may need modulo
             self.resume_index = self.resume_index % len(train_dataset)
             # increments the dataset indices we have already covered
             dataset_indices = range(self.resume_index, len(train_dataset))

@@ -2,10 +2,11 @@ defaults:
     - _self_
     - trainer: base
     - optimization: base
-    - data: stage_1_consolidated_11_07
+    - data: stage_2_11_29_22.yaml
     - model: tiny
     - tokenizer: base
     - lightning: base
+    - autorestart: base
 
 run_name: tmp 
 experiment_name: Default

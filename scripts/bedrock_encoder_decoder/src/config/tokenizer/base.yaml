@@ -1,3 +1,3 @@
 _target_: mstar.AutoTokenizer.from_pretrained
-pretrained_model_name_or_path: /mnt/tokenizer/mstar-t5-sentencepiece-extra_ids_1920-byte_fallback/
+pretrained_model_name_or_path: /mnt/tokenizer/mstar-t5-20B-bedrock-stage_2_t5_600B_embed_fix-nfkc/
 model_max_length: 100000 #to avoid warnings

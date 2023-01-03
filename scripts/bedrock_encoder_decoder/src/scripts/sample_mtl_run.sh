@@ -1,7 +1,7 @@
 #!/bin/bash
 NAME='tmp'
 MAX_STEPS=5
-VAL_INTERVAL=2
+CKPT_INTERVAL=4
 SAVE_INTERVAL=10000
 CKPT='' 
 LIMIT_VAL_BATCHES=5 
@@ -29,10 +29,9 @@ python3 pretrain_main.py\
         deepspeed_path=config/deepspeed/bf16_zero2d.json\
         trainer.max_steps=${MAX_STEPS}\
         trainer.log_every_n_steps=1\
-        trainer.val_check_interval=${VAL_INTERVAL}\
         trainer.replace_sampler_ddp=False\
         trainer.limit_val_batches=${LIMIT_VAL_BATCHES}\
-        lightning.callbacks.checkpoint.every_n_train_steps=2\
+        lightning.callbacks.checkpoint.every_n_train_steps=${CKPT_INTERVAL}\
         ++average_loss_over_examples=1\
         ++data.autotokenizer_path=/mnt/tokenizer/mstar-t5-sentencepiece-extra_ids_1920-byte_fallback/\
         ++model.state_dict_path=/mnt/adirawal/packaged_models/mstar-t5-1-9B-bedrock/stage_3_t5_bytepatch/pytorch_model.bin\
