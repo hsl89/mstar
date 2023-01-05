@@ -69,8 +69,9 @@ class PlModel(pl.LightningModule):
         self.optimizer_cfg = optimizer_cfg
 
     def setup(self, stage):
-
-        self.model = self.model_init_fn()
+        # need to pass trainer into init function
+        # required to support state dict load
+        self.model = self.model_init_fn(self.trainer)
 
     def training_step(self, batch, batch_idx):
 

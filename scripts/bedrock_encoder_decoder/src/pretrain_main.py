@@ -59,6 +59,10 @@ def main(cfg):
             cfg.model.ckpt_path = utils.auto_restart.latest_ckpt_wrapper_from_cfg(cfg)
 
             logger.info(f"Resuming from checkpoint to {cfg.model.ckpt_path}. None indicates restarting training")
+            if cfg.model.state_dict_path and cfg.model.ckpt_path:
+                # checkpoint will overwrite state dict load anyway
+                logger.info(f"Resuming from checkpoint to {cfg.model.ckpt_path}. Overwriting state dict path {cfg.model.state_dict_path}")
+                cfg.model.state_dict_path=None
 
     # If dataloader is already multiprocessing, skip this
     if cfg.data.num_workers > 0:
@@ -127,13 +131,9 @@ def main(cfg):
     )
  
     assert len(list(filter(None,[cfg.model.state_dict_path,cfg.model.ckpt_path])))<=1, "Resume from either cfg.model.state_dict_path or cfg.model.ckpt_path not both"
-    model_init_fn = lambda : models.utils.load_model(
-        trainer=trainer,
-        precision=cfg.trainer.precision, 
-        model_config=hf_model_config,
-        state_dict_path=cfg.model.state_dict_path,
-    )
-    
+
+    model_init_fn = lambda x: models.utils.model_init_fn(trainer=x, state_dict_path=cfg.model.state_dict_path, hf_model_config=hf_model_config)    
+
     if cfg.data.source=="mtl":
 
         VAL_LOSS_NAMES = ['labeled_val_loss', 'validation_loss']

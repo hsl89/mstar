@@ -1,7 +1,7 @@
 """
 General utilities to accompany model creation
 """
-
+from typing import Union
 import deepspeed
 import mstar
 from mstar.models.t5 import MStarT5Config, MStarT5ForConditionalGeneration
@@ -24,9 +24,85 @@ def count_model_parameters(hf_model_config: MStarT5Config):
 
     return num_params
 
+def get_dtype(precision: Union[str,int]):
+    """
+    Given PTL precision, convert to torch dtype 
+    """        
+    if precision==16:
+        return th.float16
+    elif precision=="bf16":
+        return th.bfloat16
+    elif precision==32:
+        return th.float32
+    else:
+        raise NotImplementedError(f"precision {precision} not implemented")
+
+def model_init_fn(trainer, state_dict_path, hf_model_config):
+        unwrapped_state_dict = None
+        if trainer.is_global_zero:
+            unwrapped_state_dict = th.load(
+                state_dict_path, map_location="cpu"
+            )
+
+        def load(module: th.nn.Module, prefix=""):
+            nonlocal unwrapped_state_dict
+            missing_keys = []
+            unexpected_keys = []
+            error_msgs = []
+                # copy state_dict so _load_from_state_dict can modify it
+            metadata = getattr(unwrapped_state_dict, "_metadata", None)
+            state_dict = None
+            if trainer.is_global_zero:
+                state_dict = unwrapped_state_dict.copy()
+
+                if metadata is not None:
+                    state_dict._metadata = metadata
+
+            local_metadata = (
+                {} if metadata is None else metadata.get(prefix[:-1], {})
+            )
+                # because zero3 puts placeholders in model params, this context
+                # manager gathers (unpartitions) the params of the current layer, then loads from
+                # the state dict and then re-partitions them again
+            with deepspeed.zero.GatheredParameters(
+                list(module.parameters(recurse=False)), modifier_rank=0
+            ):
+                if trainer.is_global_zero:
+                    module._old_load_from_state_dict(
+                        state_dict=state_dict,
+                        prefix=prefix,
+                        local_metadata=local_metadata,
+                        strict=True,
+                        missing_keys=missing_keys,
+                        unexpected_keys=unexpected_keys,
+                        error_msgs=error_msgs,
+                    )
+
+            for name, child in module._modules.items():
+                if child is not None:
+                    load(child, prefix + name + ".")
+	    
+        init_dtype = get_dtype(trainer.precision)
+
+        context = deepspeed.zero.Init(
+            remote_device=trainer.strategy.remote_device,
+            pin_memory=True,
+            config=trainer.strategy.config,
+            dtype=init_dtype,
+        )  
+
+        with context:
+            model = MStarT5ForConditionalGeneration(
+                config=hf_model_config
+            )
+
+        load(model, prefix="")
+
+        return model
+
 def load_model(
-    model_config,
     trainer,
+    model_config,
     precision,
     state_dict_path=None,
     state_dict_attribute="auto",
@@ -78,12 +154,14 @@ def load_model(
     context = contextlib.nullcontext()
     zero_stage_3 = (
         isinstance(
-            trainer.strategy,
+            trainer.strategy,#strategy,
             pl.strategies.DeepSpeedStrategy,
         )
         and trainer.strategy.zero_stage_3
         and not meta_context
     )
+    
+
     if zero_stage_3:
         if trainer.strategy.precision_plugin.precision in (16, "mixed"):
             dtype = th.float16

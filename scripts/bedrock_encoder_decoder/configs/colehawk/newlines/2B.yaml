@@ -1,0 +1,27 @@
+args:
+- --nnodes=17
+- --nproc_per_node=8
+- --max_restarts=0
+- pretrain_main.py
+- experiment_name=colehawk/newlines
+- lightning/plugins/environment=torch_elastic #necessary for elastic controller
+- run_name=2B_newline_fix
+- model.ckpt_path="auto"
+- optimization.optimizer.lr=0.00005
+- optimization/scheduler=linear
+- max_steps=150000
+- model=1_9B
+- model.state_dict_path=/mnt/colehawk/bedrock/nfkc_fix/2B/pytorch_model.bin
+- lightning.callbacks.checkpoint.every_n_train_steps=10000
+- trainer.limit_val_batches=50
+- optimization.micro_batch_size=4
+command: ["python3","-m","torch.distributed.run"]
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock-01-04-dev
+name: colehawk-newline-s
+node_type: p4d.24xlarge
+dag_type: "elastic_job_dag" # elastic job dag type
+node_num: 17
+min_replica: 17
+max_replica: 17
+updated_replica: 17
+max_dag_triggers: 10 # this parameter will trigger the restart of the dag if the launch job failed for some reason
