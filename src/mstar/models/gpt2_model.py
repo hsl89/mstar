@@ -33,6 +33,7 @@ from transformers.utils.model_parallel_utils import assert_device_map, get_devic
 from transformers.configuration_utils import PretrainedConfig
 
 from mstar.utils.alibi import get_slopes
+import numpy as np
 
 logger = logging.get_logger(__name__)
 
@@ -51,7 +52,11 @@ GPT2_PRETRAINED_MODEL_ARCHIVE_LIST = [
 
 
 def compute_alibi_bias(max_pos, attn_heads):
-    slopes = torch.Tensor(get_slopes(attn_heads))
+    # following is a work-around to be able to initialize models in deepspeed context
+    slopes = torch.zeros(attn_heads)
+    # perform operations in float on cpu so that we can use numpy
+    slopes = slopes.to(torch.float).to("cpu") + np.array(get_slopes(attn_heads))
+
     # In the next line, the part after the * is what constructs the diagonal matrix (right matrix in Figure 3 in the paper).
     # If you run it you'll see that it doesn't exactly print out the same matrix as we have in Figure 3, but one where all rows are identical.
     # This works because the softmax operation is invariant to translation, and our bias functions are always linear.
@@ -128,6 +133,42 @@ class GPT2Attention(nn.Module):
                 self.alibi = self.alibi.to(torch.float16)
             elif config.precision == "bf16":
                 self.alibi = self.alibi.to(torch.bfloat16)
+
+    def _attn_torch(self, query, key, value, attention_mask=None, head_mask=None):
+        attn_weights = torch.matmul(query, key.transpose(-1, -2))
+
+        if self.scale_attn_weights:
+            attn_weights = attn_weights / (float(value.size(-1)) ** 0.5)
+
+        if self.positional_embedding == 'alibi':
+            # if the number of input tokens is less than max expected tokens, resize the alibi bias
+            n_token = attn_weights.size(-1)
+            if n_token < self.alibi.size(-1):
+                alibi = self.alibi[:, :, 0:n_token]
+                attn_weights = attn_weights + alibi.to(query.get_device()).unsqueeze(0)
+            else:
+                attn_weights = attn_weights + self.alibi.to(query.get_device()).unsqueeze(0)
+
+        if not self.is_cross_attention:
+            # if only "normal" attention layer implements causal mask
+            query_length, key_length = query.size(-2), key.size(-2)
+            causal_mask = self.bias[:, :, key_length - query_length : key_length, :key_length].bool()
+            attn_weights = torch.where(causal_mask, attn_weights, self.masked_bias.to(attn_weights.dtype))
+
+        if attention_mask is not None:
+            # Apply the attention mask
+            attn_weights = attn_weights + attention_mask
+
+        attn_weights = nn.Softmax(dim=-1)(attn_weights)
+        attn_weights = self.attn_dropout(attn_weights)
+
+        # Mask heads if we want to
+        if head_mask is not None:
+            attn_weights = attn_weights * head_mask
+
+        attn_output = torch.matmul(attn_weights, value)
+
+        return attn_output, attn_weights
 
     def _attn_fused(self, query, key, value, attention_mask=None, head_mask=None):
         # attention_scores
@@ -228,7 +269,10 @@ class GPT2Attention(nn.Module):
         else:
             present = None
 
-        attn_output, attn_weights = self._attn_fused(query, key, value, attention_mask, head_mask)
+        if self.masked_softmax_fusion:
+            attn_output, attn_weights = self._attn_fused(query, key, value, attention_mask, head_mask)
+        else:
+            attn_output, attn_weights = self._attn_torch(query, key, value, attention_mask, head_mask)
 
         attn_output = self._merge_heads(attn_output, self.num_heads, self.head_dim)
         attn_output = self.c_proj(attn_output)
