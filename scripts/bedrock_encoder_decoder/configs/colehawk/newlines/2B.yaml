@@ -16,7 +16,7 @@ args:
 - trainer.limit_val_batches=50
 - optimization.micro_batch_size=4
 command: ["python3","-m","torch.distributed.run"]
-image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock-01-04-dev
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock-01-05-dev
 name: colehawk-newline-s
 node_type: p4d.24xlarge
 dag_type: "elastic_job_dag" # elastic job dag type

@@ -39,7 +39,7 @@ def get_dtype(precision: Union[str,int]):
 
 def model_init_fn(trainer, state_dict_path, hf_model_config):
         unwrapped_state_dict = None
-        if trainer.is_global_zero:
+        if trainer.is_global_zero and state_dict_path is not None:
             unwrapped_state_dict = th.load(
                 state_dict_path, map_location="cpu"
             )
@@ -96,7 +96,8 @@ def model_init_fn(trainer, state_dict_path, hf_model_config):
                 config=hf_model_config
             )
 
-        load(model, prefix="")
+        if state_dict_path is not None:
+            load(model, prefix="")
 
         return model
 
