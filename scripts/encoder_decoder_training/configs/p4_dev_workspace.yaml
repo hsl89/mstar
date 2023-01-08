@@ -1,5 +1,0 @@
-name: "colehawk-p4-dev"
-node_type: "p4d.24xlarge"
-node_num: 1
-gpu: 8
-image: 747303060528.dkr.ecr.REGION_TAG.amazonaws.com/mstar-eks:USER_TAG-NAME_TAG

@@ -1,7 +1,0 @@
-zero_optimization: True
-stage: 2
-contiguous_gradients: false
-allgather_bucket_size: 5e8
-reduce_bucket_size: 5e8
-overlap_comm: true
-zero_allow_untested_optimizer: true
