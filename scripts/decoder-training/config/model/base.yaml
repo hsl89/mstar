@@ -1,0 +1,16 @@
+# path to the model architecture
+arch_path: config/model/architecture/gpt2_1.3B_input1024.json
+# Whether to enable gradient checkpointing in the model
+gradient_checkpointing: false
+# Whether to enable fused softmax in the model.
+fused_scaled_masked_softmax: true
+# Whether to enable fused GeLU in the model.
+fused_gelu: true
+# where do you want to store the pretrained models downloaded from huggingface.co
+cache_dir: null
+# path to previously saved checkpoint while loading models
+ckpt_path: null
+# type of positional embedding to use
+positional_embedding: alibi
+# whether to scale the standard deviation for weight initializatio
+scale_init_std: false

@@ -1,0 +1,19 @@
+num_nodes: 1
+check_val_every_n_epoch: 1
+default_root_dir: /mnt_out/radhna/test/
+enable_progress_bar: true
+gpus: -1
+#gradient_clip_val: 1.0
+log_every_n_steps: 50
+#log_gpu_memory: null
+max_epochs: null
+max_steps: 100000
+# the following is necessary to be 0 for using zero-2d
+num_sanity_val_steps: 0
+precision: bf16
+reload_dataloaders_every_n_epochs: 0 # not needed for online example packing
+replace_sampler_ddp: false # necessary since we manage the sampler
+#track_grad_norm: -1
+val_check_interval: 5000
+gradient_clip_val: 1.0
+#accelerator: deepspeed

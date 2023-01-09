@@ -1,0 +1,12 @@
+{
+    "prescale_gradients": false,
+    "zero_optimization": {
+        "stage": 3,
+        "contiguous_gradients": false,
+        "overlap_comm": true
+    },
+    "zero_allow_untested_optimizer": true,
+    "allgather_bucket_size": 5e8,
+    "reduce_bucket_size": 5e8
+}
+

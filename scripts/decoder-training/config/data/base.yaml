@@ -1,0 +1,22 @@
+# options for data preparation
+
+# path to the train and val set
+training_dataset: /mnt/pile_arrow_no_youtube_no_exact_match/suffix_dedup_thres_100bytes/train.arrow
+validation_dataset: /mnt/pile_arrow_no_youtube_no_exact_match/val.arrow
+# The maximum total input sequence length after tokenization.
+max_seq_length: 1024
+# Number of workers for dataloader per gpu
+num_workers: 1
+# number of batches to pre-fetch during each forward step
+prefetch_factor: 2
+# Max number of batches to use for validation
+max_valid_batch: 1000
+# Exponential penalty to the length. 1.0 means no penalty
+length_penalty: 1
+# path to load state dict saved on rank 0 while loading models.
+data_state_path: null
+# tokenizer arguments
+tokenizer: gpt2
+tokenizer_path: null
+# add_special_tokens to the tokenizer, mainly used for multi-task learning
+add_special_tokens: false

@@ -1,0 +1,9 @@
+hydra-core>=1.2
+transformers>=4.18.0
+datasets==1.11.0
+tqdm
+git+https://github.com/leezu/metrics@workaround-484#egg=torchmetrics
+https://github.com/leezu/apex/tarball/fc7a3a9bd4e7c5295ca1eca05da83e7a16686087
+ninja
+s3fs
+mlflow==1.27.0

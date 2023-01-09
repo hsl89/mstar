@@ -1,0 +1,18 @@
+defaults:
+    - _self_
+    - trainer: base
+    - optimizer: base
+    - data: base
+    - model: base
+    - callback: base
+
+# which data module to use
+data_module_type: base
+# which model module to use
+model_module_type: base
+run_name: 1_3B
+experiment_name: decoder-pretraining
+#accelerator: deepspeed
+deepspeed_config: config/deepspeed/stage2_bf16.json #can use zero2d if multimodel required
+validate_only: 0 #skip all training
+

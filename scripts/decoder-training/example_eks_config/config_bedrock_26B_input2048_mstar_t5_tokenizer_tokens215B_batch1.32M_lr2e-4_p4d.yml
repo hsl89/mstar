@@ -1,0 +1,42 @@
+name: "dec-26B-t5-2048-bth1.3m-lr2e-4-st162k"
+node_type: "p4d.24xlarge"
+node_num: 81
+spine: "spine1"
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:radhna
+command:
+  - /usr/bin/python3
+args:
+  - pretrain_main.py
+  - data.training_dataset=/mnt/pretraining-data/package-01-06-23-v1/train.arrow
+  - data.validation_dataset=/mnt/pretraining-data/package-01-06-23-v1/val.arrow
+  - model.arch_path=config/model/architecture/gpt2_26B.json
+  - deepspeed_config=config/deepspeed/stage2d-bf16-shard24.json
+  - model.positional_embedding=absolute
+  - trainer.max_steps=162000
+  - optimizer.batch_size=1
+  - data.max_seq_length=2048
+  - data.max_valid_batch=1000 # 1750000000/(2048*1*8*82) ~= 1302
+  - trainer.val_check_interval=2000
+  - callback.save_every_n_steps=2000
+  - data.num_workers=1
+  # tokenizer config
+  - data.tokenizer=mstar-t5
+  - data.tokenizer_path=/mnt/tokenizer/mstar-t5-20B-bedrock-stage_2_t5_600B_embed_fix-nfkc/
+  - trainer.precision=bf16
+  - trainer.replace_sampler_ddp=false
+  - optimizer.base_learning_rate=2e-4
+  - optimizer.lr_scheduler_type=linear
+  - optimizer.warmup_steps=2000
+  - optimizer.lr_min_ratio=0.1
+  - optimizer.lr_plateau_ratio=0.1
+  - optimizer.weight_decay=0.05
+  - optimizer.seed=1234
+  - trainer.default_root_dir=/mnt_out/radhna/bedrock_prod/dec_52B_bedrock_mstar_t5_tokenizer_input2048_abs_pos_batch1x8x81_bf16_tokens215B_steps162k_lr2e-4/
+  - model.gradient_checkpointing=true
+  - model.scale_init_std=true
+  - trainer.gradient_clip_val=1.0
+  - trainer.reload_dataloaders_every_n_epochs=0
+  - trainer.num_sanity_val_steps=0
+  - callback.save_top_k=100
+  - model.ckpt_path=null
+  - run_name=dec-26B-bedrock-mstar-t5-tokenizer-abs-pos-onepkg-ctx2048-bth1x8x81-bf16-st162k-lr2e-4
