@@ -1,0 +1,50 @@
+args:
+- --nnodes=16
+- --nproc_per_node=8
+- --max_restarts=0
+- pretrain_main.py
+- experiment_name=samson/tokenizer_candidate
+- run_name=2B_stg1_tok_candidate
+- max_steps=50000
+- collator.output_targets=t5
+- optimization/scheduler=linear
+- optimization.micro_batch_size=4
+- optimization.optimizer.lr=0.00025
+- trainer.limit_val_batches=50
+- trainer.default_root_dir=/mnt_out/samson/bedrock/tokenizer-validation/
+- model=1_9B
+- data=stage_2_11_29_22
+- data.training_datasets=[
+        /mnt/pretraining-data/package-11-25-22-v1/train1_packed_chunksize_3100.arrow,
+        /mnt/pretraining-data/package-11-25-22-v1/train2_packed_chunksize_3100.arrow,
+        /mnt/pretraining-data/package-11-25-22-v1/train3_packed_chunksize_3100.arrow,
+        /mnt/pretraining-data/package-11-25-22-v1/train4_packed_chunksize_3100.arrow,
+        /mnt/pretraining-data/package-11-25-22-v1/train5_packed_chunksize_3100.arrow,
+        /mnt/pretraining-data/package-11-25-22-v1/train6_packed_chunksize_3100.arrow,
+        /mnt/pretraining-data/package-11-25-22-v1/train7_packed_chunksize_3100.arrow,
+        /mnt/pretraining-data/package-11-25-22-v1/train8_packed_chunksize_3100.arrow,
+        /mnt/pretraining-data/package-11-25-22-v1/train9_packed_chunksize_3100.arrow
+    ]
+
+- data.validation_datasets=[
+        /mnt/pretraining-data/package-11-25-22-v1/val_packed_chunksize_3100.arrow
+    ]
+
+- tokenizer.pretrained_model_name_or_path=/mnt/tokenizer/bedrock_production_candidate_v2
+- model.ckpt_path=auto
+- lightning/plugins/environment=torch_elastic #necessary for elastic controller
+
+command: ["python3","-m","torch.distributed.run"]
+image: 747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-eks:colehawk-online-12-21
+name: samson-2B-stg1-tokenizer-candidate
+node_num: 16
+node_type: p4d.24xlarge
+dag_type: "elastic_job_dag" # elastic job dag type
+min_replica: 16
+max_replica: 16
+updated_replica: 16
+max_dag_triggers: 16
+
+env:
+  HYDRA_FULL_ERROR: "1"
+

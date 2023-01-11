@@ -1,0 +1,34 @@
+args:
+- --nnodes=16
+- --nproc_per_node=8
+- --max_restarts=0
+- pretrain_main.py
+- experiment_name=samson/tokenizer_baseline
+- run_name=2B_stg2_tok_baseline
+- max_steps=50000
+- optimization/scheduler=linear
+- optimization.micro_batch_size=4
+- optimization.optimizer.lr=0.00025
+- trainer.limit_val_batches=50
+- trainer.default_root_dir=/mnt_out/samson/bedrock/tokenizer-validation/
+- model=1_9B
+- data=stage_2_11_29_22
+- tokenizer.pretrained_model_name_or_path=/mnt/tokenizer/mstar-t5-20B-bedrock-stage_2_t5_600B_embed_fix-nfkc
+- model.ckpt_path=auto
+- model.state_dict_path= #TODO
+- ++data.resume_index=50000
+- lightning/plugins/environment=torch_elastic #necessary for elastic controller
+
+command: ["python3","-m","torch.distributed.run"]
+image: 747303060528.dkr.ecr.us-east-2.amazonaws.com/mstar-eks:colehawk-online-12-21
+name: samson-2B-stg2-tokenizer-baseline
+node_num: 16
+node_type: p4d.24xlarge
+dag_type: "elastic_job_dag" # elastic job dag type
+min_replica: 16
+max_replica: 16
+updated_replica: 16
+max_dag_triggers: 16
+
+env:
+  HYDRA_FULL_ERROR: "1"

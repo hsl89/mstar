@@ -49,6 +49,8 @@ Also, you can filter out keywords by adding to the hydra config. It's necessary 
 ++filter_keywords=['last.ckpt','step\\=200','step\\=150']
 ```
 
+Run names should be different from previous runs, otherwise the deepspeed checkpoint from the previous run will be loaded. This is particularly important for Stage 2 configs, since the deepspeed checkpoint will overwrite the state dict even if a packaged model is provided.
+
 
 # Known Issues
 
