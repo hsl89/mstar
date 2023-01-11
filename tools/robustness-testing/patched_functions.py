@@ -178,7 +178,7 @@ def perturb_evaluate(
     subsampled_indices = get_subsampled_indices(example_subsample_factor, task_name, template_names)
 
     # get the indices first to ensure we have the same prompt templates across perturbations
-    if num_sampled_templates > 0:
+    if num_sampled_templates > 0 and num_sampled_templates < len(template_names):
         task_indices = get_sampled_task_indices(num_sampled_templates, task_name, template_names)
 
     for perturber_name in tqdm(perturber_list, desc="outer loop"):

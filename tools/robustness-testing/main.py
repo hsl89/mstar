@@ -202,7 +202,6 @@ def main():
     start_time = time.monotonic()
     args = parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
-    assert not args.provide_description  # not implemented
 
     if args.limit:
         logger.warning(
