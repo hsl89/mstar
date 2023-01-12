@@ -161,6 +161,7 @@ def main(cfg):
             cfg.lightning.data_module,
             tokenizer=tokenizer,
             labeled_batch=cfg.optimization.labeled_micro_batch_size,
+            unlabeled_batch=cfg.optimization.unlabeled_micro_batch_size,
             max_seq_length=cfg.data.max_seq_length,
             labeled_max_ip_seq_len=cfg.data.max_seq_length,
             labeled_max_op_seq_len=cfg.data.max_output_length,

@@ -5,6 +5,7 @@ from typing import Union
 import deepspeed
 import mstar
 from mstar.models.t5 import MStarT5Config, MStarT5ForConditionalGeneration
+import mstar.models.t5
 import torch as th
 import pytorch_lightning as pl
 import contextlib
