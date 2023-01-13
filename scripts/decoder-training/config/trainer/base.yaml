@@ -3,6 +3,7 @@ check_val_every_n_epoch: 1
 default_root_dir: /mnt_out/radhna/test/
 enable_progress_bar: true
 gpus: -1
+limit_val_batches: null
 #gradient_clip_val: 1.0
 log_every_n_steps: 50
 #log_gpu_memory: null

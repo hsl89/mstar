@@ -38,6 +38,28 @@ def main(cfg):
     if cfg.data.num_workers > 0:
         os.environ['TOKENIZERS_PARALLELISM'] = "true"
 
+
+    logger.info(f"Received ckpt path keyword {cfg.model.ckpt_path}")
+    if cfg.model.ckpt_path:
+        if cfg.model.ckpt_path=="auto":
+            import utils
+            logger.info(f"Searching for checkpoint with keyword auto")
+            #will either return most recent checkpoint or None if no ckpt present
+            cfg.model.ckpt_path = utils.auto_restart.latest_ckpt_wrapper_from_cfg(cfg)
+
+            if cfg.model.ckpt_path is None:
+                logger.info(f"Found no checkpoint using keyword auto, starting from scratch")
+
+            else:
+                logger.info(f"Resuming from model checkpoint {cfg.model.ckpt_path}")
+                cfg.data.data_state_path = os.path.join(cfg.model.ckpt_path,'checkpoint/zero_pp_rank_0_mp_rank_00_model_states.pt')
+                logger.info(f"Resuming from data state path {cfg.data.data_state_path}")
+
+        else:
+            logger.info(f"Resuming from checkpoint {cfg.model.ckpt_path}")
+    else:
+        logger.info("No checkpoint passed, starting training from scratch")
+       
     # Set seed before initializing model.
     pl.utilities.seed.seed_everything(cfg.optimizer.seed)
 

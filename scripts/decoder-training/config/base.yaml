@@ -5,6 +5,7 @@ defaults:
     - data: base
     - model: base
     - callback: base
+    - autorestart: base
 
 # which data module to use
 data_module_type: base

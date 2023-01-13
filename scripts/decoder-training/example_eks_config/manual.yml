@@ -1,0 +1,47 @@
+name: "colehawk-dec-manual"
+node_type: "p4d.24xlarge"
+node_num: 4
+spine: "spine1"
+max_dag_triggers: 1
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-decoder-01-10
+command:
+  - /usr/bin/python3
+args:
+  - pretrain_main.py
+  - model.ckpt_path=/mnt_out/colehawk/test_bedrock_prod/test_auto/7/to_resume/
+  - data.data_state_path=/mnt_out/colehawk/test_bedrock_prod/test_auto/7/to_resume/checkpoint/zero_pp_rank_0_mp_rank_00_model_states.pt
+  - trainer.default_root_dir=/mnt_out/colehawk/test_bedrock_prod/test_auto/
+  - trainer.limit_val_batches=10
+  - trainer.val_check_interval=50
+  - callback.save_every_n_steps=50
+  - data.training_dataset=/mnt/pretraining-data/package-01-06-23-v1/val.arrow
+  - data.validation_dataset=/mnt/pretraining-data/package-01-06-23-v1/val.arrow
+  - model.arch_path=config/model/architecture/gpt2_1.3B.json
+  - deepspeed_config=config/deepspeed/stage2d-bf16-shard8.json
+  - model.positional_embedding=absolute
+  - trainer.max_steps=215000
+  - optimizer.batch_size=2
+  - data.max_seq_length=2048
+  - data.max_valid_batch=1000 # 1750000000/(2048*2*8*32) ~= 1668
+  - data.num_workers=1
+  # tokenizer config
+  - data.tokenizer=mstar-t5
+  - data.tokenizer_path=/mnt/tokenizer/mstar-t5-20B-bedrock-stage_2_t5_600B_embed_fix-nfkc/
+  - trainer.precision=bf16
+  - trainer.replace_sampler_ddp=false
+  - optimizer.base_learning_rate=2e-4
+  - optimizer.lr_scheduler_type=linear
+  - optimizer.warmup_steps=2000
+  - optimizer.lr_min_ratio=0.1
+  - optimizer.lr_plateau_ratio=0.1
+  - optimizer.weight_decay=0.05
+  - optimizer.seed=1234
+  - model.gradient_checkpointing=false
+  - model.scale_init_std=true
+  - trainer.gradient_clip_val=1.0
+  - trainer.reload_dataloaders_every_n_epochs=0
+  - trainer.num_sanity_val_steps=0
+  - callback.save_top_k=100
+  - run_name=manual_resume
+env:
+  HYDRA_FULL_ERROR: "1"

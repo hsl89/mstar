@@ -1,7 +1,8 @@
-name: "dec-26B-t5-2048-bth1.3m-lr2e-4-st162k"
+name: "dec-26B-t5-2048-bth1.2m-lr2e-4-st180k"
 node_type: "p4d.24xlarge"
-node_num: 81
+node_num: 72
 spine: "spine1"
+max_dag_triggers: 5
 image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:radhna
 command:
   - /usr/bin/python3
@@ -10,9 +11,11 @@ args:
   - data.training_dataset=/mnt/pretraining-data/package-01-06-23-v1/train.arrow
   - data.validation_dataset=/mnt/pretraining-data/package-01-06-23-v1/val.arrow
   - model.arch_path=config/model/architecture/gpt2_26B.json
-  - deepspeed_config=config/deepspeed/stage2d-bf16-shard24.json
+  #- deepspeed_config=config/deepspeed/stage2d-bf16-shard24.json
+  - deepspeed_config=config/deepspeed/stage2d-bf16-shard32.json
+  #- deepspeed_config=config/deepspeed/stage2d-bf16-shard24-bucket1e8.json
   - model.positional_embedding=absolute
-  - trainer.max_steps=162000
+  - trainer.max_steps=180000
   - optimizer.batch_size=1
   - data.max_seq_length=2048
   - data.max_valid_batch=1000 # 1750000000/(2048*1*8*82) ~= 1302
@@ -20,6 +23,7 @@ args:
   - callback.save_every_n_steps=2000
   - data.num_workers=1
   # tokenizer config
+  #- data.tokenizer_path=/mnt/tokenizer/unigramlm_NFD_sep-digits_keep-all-ws_merge-nl-t_norm-bedrock221107_random_chunk_msl-8192_n-10000000_v-50000.model
   - data.tokenizer=mstar-t5
   - data.tokenizer_path=/mnt/tokenizer/mstar-t5-20B-bedrock-stage_2_t5_600B_embed_fix-nfkc/
   - trainer.precision=bf16
@@ -31,7 +35,7 @@ args:
   - optimizer.lr_plateau_ratio=0.1
   - optimizer.weight_decay=0.05
   - optimizer.seed=1234
-  - trainer.default_root_dir=/mnt_out/radhna/bedrock_prod/dec_52B_bedrock_mstar_t5_tokenizer_input2048_abs_pos_batch1x8x81_bf16_tokens215B_steps162k_lr2e-4/
+  - trainer.default_root_dir=/mnt_out/radhna/bedrock_prod/dec_26B_bedrock_mstar_t5_tokenizer_input2048_abs_pos_batch1x8x72_bf16_tokens215B_steps180k_lr2e-4/
   - model.gradient_checkpointing=true
   - model.scale_init_std=true
   - trainer.gradient_clip_val=1.0
@@ -39,4 +43,5 @@ args:
   - trainer.num_sanity_val_steps=0
   - callback.save_top_k=100
   - model.ckpt_path=null
-  - run_name=dec-26B-bedrock-mstar-t5-tokenizer-abs-pos-onepkg-ctx2048-bth1x8x81-bf16-st162k-lr2e-4
+  #- run_name=dec-1.3B-bedrock-gpt2-tokenizer-alibi-onepkg-ctx2048-bth2x8x32-bf16-st100k-lr1e-3
+  - run_name=dec-26B-bedrock-mstar-t5-tokenizer-abs-pos-onepkg-ctx2048-bth1x8x72-bf16-st180k-lr2e-4

@@ -1,0 +1,15 @@
+{
+    "prescale_gradients": false,
+    "bf16": {
+        "enabled": true
+    },
+    "zero_optimization": {
+        "stage": 3,
+        "contiguous_gradients": false,
+        "overlap_comm": true,
+        "zero2d_shard_size": 2,
+        "zero2d_local_shard": true,
+        "zero2d_hierarchy_allgather": false
+    },
+    "zero_allow_untested_optimizer": true
+}

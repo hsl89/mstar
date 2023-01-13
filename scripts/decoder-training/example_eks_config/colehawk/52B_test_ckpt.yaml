@@ -1,26 +1,29 @@
-name: "dec-52B-t5-2048-bth1.3m-lr1e-4-st160k"
+name: "colehawk-test-ckpt"
+env:
+  HYDRA_FULL_ERROR: "1"
 node_type: "p4de.24xlarge"
-node_num: 82
+node_num: 3
 spine: "spine1"
 image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-dec-01-12
 command:
   - /usr/bin/python3
 args:
   - pretrain_main.py
+  - model.ckpt_path=auto
+  - trainer.val_check_interval=2000
+  - callback.save_every_n_steps=2000
+  - trainer.limit_val_batches=50 
+  - trainer.default_root_dir=/mnt_out/radhna/bedrock_prod/shard24_dec_52B_bedrock_mstar_t5_tokenizer_input2048_abs_pos_batch1x8x82_bf16_tokens215B_steps160k_lr1e-4/
+  - run_name=shard24_dec-52B-bedrock-mstar-t5-tokenizer-abs-pos-onepkg-ctx2048-bth1x8x82-bf16-st160k-lr1e-4
   - data.training_dataset=/mnt/pretraining-data/package-01-06-23-v1/train.arrow
   - data.validation_dataset=/mnt/pretraining-data/package-01-06-23-v1/val.arrow
   - model.arch_path=config/model/architecture/gpt2_52B.json
-  - deepspeed_config=config/deepspeed/stage2d-bf16-shard16.json
+  - deepspeed_config=config/deepspeed/stage2d-bf16-shard24.json
   - model.positional_embedding=absolute
   - trainer.max_steps=160000
   - optimizer.batch_size=1
   - data.max_seq_length=2048
-  - data.max_valid_batch=1000 # 1750000000/(2048*1*8*82) ~= 1302
-  - trainer.val_check_interval=2000
-  - callback.save_every_n_steps=2000
   - data.num_workers=1
-  # tokenizer config
-  #- data.tokenizer_path=/mnt/tokenizer/unigramlm_NFD_sep-digits_keep-all-ws_merge-nl-t_norm-bedrock221107_random_chunk_msl-8192_n-10000000_v-50000.model
   - data.tokenizer=mstar-t5
   - data.tokenizer_path=/mnt/tokenizer/mstar-t5-20B-bedrock-stage_2_t5_600B_embed_fix-nfkc/
   - trainer.precision=bf16
@@ -32,13 +35,10 @@ args:
   - optimizer.lr_plateau_ratio=0.1
   - optimizer.weight_decay=0.05
   - optimizer.seed=1234
-  - trainer.default_root_dir=/mnt_out/radhna/bedrock_prod/dec_52B_bedrock_mstar_t5_tokenizer_input2048_abs_pos_batch1x8x82_bf16_tokens215B_steps160k_lr1e-4/
   - model.gradient_checkpointing=true
   - model.scale_init_std=true
-  - fused_scaled_masked_softmax=true
+  - model.fused_scaled_masked_softmax=true
   - trainer.gradient_clip_val=1.0
   - trainer.reload_dataloaders_every_n_epochs=0
   - trainer.num_sanity_val_steps=0
   - callback.save_top_k=100
-  - model.ckpt_path=null
-  - run_name=dec-52B-bedrock-mstar-t5-tokenizer-abs-pos-onepkg-ctx2048-bth1x8x82-bf16-st160k-lr1e-4
