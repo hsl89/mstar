@@ -1,29 +1,26 @@
-name: "shard24-dec-52B-t5-2048-bth1.3m-lr1e-4-st160k"
+name: "dec-26B-t5-2048-bth1.2m-lr2e-4-st180k"
 env:
   HYDRA_FULL_ERROR: "1"
   FI_LOG_LEVEL: "warn"
-node_type: "p4de.24xlarge"
-node_num: 81
+node_type: "p4d.24xlarge"
+node_num: 72
 spine: "spine1"
-image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-dec-01-12
 max_dag_triggers: 15
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-dec-01-12
 command:
   - /usr/bin/python3
 args:
   - pretrain_main.py
   - model.ckpt_path=auto
-  - trainer.val_check_interval=1200
-  - callback.save_every_n_steps=1200
+  - trainer.val_check_interval=2000
+  - callback.save_every_n_steps=2000
   - trainer.limit_val_batches=50 
-  - max_valid_batches=50
-  - trainer.default_root_dir=/mnt_out/radhna/bedrock_prod/shard24_dec_52B_bedrock_mstar_t5_tokenizer_input2048_abs_pos_batch1x8x82_bf16_tokens215B_steps160k_lr1e-4/
-  - run_name=shard24_dec-52B-bedrock-mstar-t5-tokenizer-abs-pos-onepkg-ctx2048-bth1x8x82-bf16-st160k-lr1e-4
   - data.training_dataset=/mnt/pretraining-data/package-01-06-23-v1/train.arrow
   - data.validation_dataset=/mnt/pretraining-data/package-01-06-23-v1/val.arrow
-  - model.arch_path=config/model/architecture/gpt2_52B.json
-  - deepspeed_config=config/deepspeed/stage2d-bf16-shard24.json
+  - model.arch_path=config/model/architecture/gpt2_26B.json
+  - deepspeed_config=config/deepspeed/stage2d-bf16-shard32.json
   - model.positional_embedding=absolute
-  - trainer.max_steps=160000
+  - trainer.max_steps=180000
   - optimizer.batch_size=1
   - data.max_seq_length=2048
   - data.num_workers=1
@@ -31,13 +28,14 @@ args:
   - data.tokenizer_path=/mnt/tokenizer/mstar-t5-20B-bedrock-stage_2_t5_600B_embed_fix-nfkc/
   - trainer.precision=bf16
   - trainer.replace_sampler_ddp=false
-  - optimizer.base_learning_rate=1e-4
+  - optimizer.base_learning_rate=2e-4
   - optimizer.lr_scheduler_type=linear
   - optimizer.warmup_steps=2000
   - optimizer.lr_min_ratio=0.1
   - optimizer.lr_plateau_ratio=0.1
   - optimizer.weight_decay=0.05
   - optimizer.seed=1234
+  - trainer.default_root_dir=/mnt_out/radhna/bedrock_prod/dec_26B_bedrock_mstar_t5_tokenizer_input2048_abs_pos_batch1x8x72_bf16_tokens215B_steps180k_lr2e-4/
   - model.gradient_checkpointing=true
   - model.scale_init_std=true
   - model.fused_scaled_masked_softmax=true
@@ -45,3 +43,4 @@ args:
   - trainer.reload_dataloaders_every_n_epochs=0
   - trainer.num_sanity_val_steps=0
   - callback.save_top_k=100
+  - run_name=dec-26B-bedrock-mstar-t5-tokenizer-abs-pos-onepkg-ctx2048-bth1x8x72-bf16-st180k-lr2e-4
