@@ -1,0 +1,30 @@
+args:
+- --nnodes=81 #lower than planned 99 due to instance retirements
+- --nproc_per_node=8
+- --max_restarts=0
+- pretrain_main.py
+- deepspeed_path=config/deepspeed/bf16_zero2d_shard24.json
+- run_name=50B_stg1
+- max_steps=135000 #chosen for ~15 days
+- model=50B
+- experiment_name=colehawk/50B
+- lightning/plugins/environment=torch_elastic #necessary for elastic controller
+- model.ckpt_path="auto"
+- optimization.optimizer.lr=0.0001
+- optimization/scheduler=linear
+- lightning.callbacks.checkpoint.every_n_train_steps=1250 #4hrs per ckpt
+- trainer.limit_val_batches=50
+- optimization.micro_batch_size=1
+- data=stage_2_01_06 #default is mixed
+- data.collator_output_targets=t5 #override with t5 loss for stg1
+- data.clm_max_doc=1 #only matters with mixed clm/t5 output
+command: ["python3","-m","torch.distributed.run"]
+image: 747303060528.dkr.ecr.us-west-2.amazonaws.com/mstar-eks:colehawk-bedrock-01-07-dev
+name: colehawk-50b-stg1
+node_type: p4de.24xlarge
+dag_type: "elastic_job_dag" # elastic job dag type
+node_num: 81
+min_replica: 81
+max_replica: 81
+updated_replica: 81
+max_dag_triggers: 81 # this parameter will trigger the restart of the dag if the launch job failed for some reason
