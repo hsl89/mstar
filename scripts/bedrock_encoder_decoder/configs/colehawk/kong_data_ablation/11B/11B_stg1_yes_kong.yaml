@@ -1,0 +1,31 @@
+args:
+- --nnodes=32
+- --nproc_per_node=8
+- --max_restarts=0
+- pretrain_main.py
+- deepspeed_path=config/deepspeed/bf16_zero2d_shard16.json
+- run_name=11B_stg1_yes_kong_data_ablation
+- max_steps=60000 #chosen for ~3 days
+- model=11B
+- experiment_name=colehawk/kong_data_ablation
+- lightning/plugins/environment=torch_elastic #necessary for elastic controller
+- model.ckpt_path="auto"
+- optimization.optimizer.lr=0.0001
+- optimization/scheduler=linear
+- lightning.callbacks.checkpoint.every_n_train_steps=5000
+- trainer.limit_val_batches=50
+- optimization.micro_batch_size=2
+- data.collator_output_targets=t5 #override with t5 loss for stg1
+- data.clm_max_doc=2 #only matters with mixed clm/t5 output
+command: ["python3","-m","torch.distributed.run"]
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock-01-07-dev
+name: colehawk-11b-yeskong-stg1
+node_type: p4d.24xlarge
+dag_type: "elastic_job_dag" # elastic job dag type
+node_num: 32
+min_replica: 32
+max_replica: 32
+updated_replica: 32
+max_dag_triggers: 32 # this parameter will trigger the restart of the dag if the launch job failed for some reason
+env:
+  HYDRA_FULL_ERROR: "1" #useful for cloudwatch debugging
