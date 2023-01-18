@@ -14,7 +14,10 @@ from transformers.trainer_pt_utils import get_parameter_names
 import math
 from torch.optim.lr_scheduler import LambdaLR
 
-def get_inverse_sqrt_schedule(optimizer, num_warmup_steps, scale_factor=10000, num_constant_steps=0, last_epoch=-1):
+
+def get_inverse_sqrt_schedule(
+    optimizer, num_warmup_steps, scale_factor=10000, num_constant_steps=0, last_epoch=-1
+):
     """Inverse square root learning rate schedule with linear warmup from 0
 
     Args:
@@ -39,16 +42,19 @@ def get_inverse_sqrt_schedule(optimizer, num_warmup_steps, scale_factor=10000, n
 
         if global_step <= num_warmup_steps:
             return global_step / num_warmup_steps
-        elif num_warmup_steps < global_step <= num_warmup_steps+num_constant_steps:
+        elif num_warmup_steps < global_step <= num_warmup_steps + num_constant_steps:
             return 1.0
         else:
-            #The scale_factor is used to ensure decay is not too rapid.
-            #Pure pure 1/sqrt(n) decay leads to 100x decay within 10k steps.
-            #scale_factor is present in both the numerator and denominator since 
-            #the LambdaLR provides a multipler to optimizer.lr which should be 1 at the end of warmup
-            return math.sqrt(scale_factor) / math.sqrt(scale_factor+global_step-num_warmup_steps-num_constant_steps)
+            # The scale_factor is used to ensure decay is not too rapid.
+            # Pure pure 1/sqrt(n) decay leads to 100x decay within 10k steps.
+            # scale_factor is present in both the numerator and denominator since
+            # the LambdaLR provides a multipler to optimizer.lr which should be 1 at the end of warmup
+            return math.sqrt(scale_factor) / math.sqrt(
+                scale_factor + global_step - num_warmup_steps - num_constant_steps
+            )
 
     return LambdaLR(optimizer, lr_lambda, last_epoch)
+
 
 class PlModel(pl.LightningModule):
     """
@@ -57,7 +63,7 @@ class PlModel(pl.LightningModule):
 
     def __init__(
         self,
-        full_experiment_config, #to log parameters, should be nested dicts
+        full_experiment_config,  # to log parameters, should be nested dicts
         model_init_fn,
         py_logger,
         optimizer_cfg,
@@ -68,10 +74,19 @@ class PlModel(pl.LightningModule):
         self.py_logger = py_logger
         self.optimizer_cfg = optimizer_cfg
 
-    def setup(self, stage):
+    def setup(self, stage: str):
+        """
+        Set up the module, including model creation
+        Args:
+            stage: PTL stage train/val/test can be used to induce different 
+                    behavior only used for inheritance
+        """
         # need to pass trainer into init function
         # required to support state dict load
         self.model = self.model_init_fn(self.trainer)
+        # get time here for first iteration at batch 0
+        # logged in on_train_batch_end
+        self._last_logged_batch_start_time = time.monotonic()
 
     def training_step(self, batch, batch_idx):
 
@@ -99,38 +114,73 @@ class PlModel(pl.LightningModule):
 
         return {"loss": loss, "num_loss_tokens": num_loss_tokens}
 
-    def on_train_batch_start(self, batch, batch_idx):
-        self._batch_start_time = time.monotonic()
-
-    def on_train_batch_end(self, outputs, batch, batch_idx):
-        batch_time = time.monotonic() - self._batch_start_time
-
+    def calculate_model_tflops(self, batch):
+        """
+        Assign model TFLOPs as an attribute for easier logging
+        Args:
+            batch: batch that will be passed into the model, useful for logging
+        """
         # compute tflops based on batch size the first time
         # assume it does not change over time
-        if not hasattr(self, "tflops_per_train_step"):
-            self.tflops_per_train_step = mstar.utils.flops_calc.compute_tflops_per_gpu(
-                model_type="encoder_decoder",
-                sec_per_step=1.0,  # will get actual time during each train-step
-                micro_batchsize=self.optimizer_cfg.micro_batch_size,
-                activation_checkpointing=self.model.is_gradient_checkpointing,
-                vocab_size=self.model.config.vocab_size,
-                hidden_size=self.model.config.hidden_size,
-                decoder_num_layers=self.model.config.num_decoder_layers,
-                encoder_num_layers=self.model.config.num_layers,
-                decoder_seq_len=batch["decoder_input_ids"].shape[-1],
-                encoder_seq_len=batch["input_ids"].shape[-1],
-                use_gated_mlp=getattr(self.model.config, "is_gated_act", False),
+        self.tflops_per_train_step = mstar.utils.flops_calc.compute_tflops_per_gpu(
+            model_type="encoder_decoder",
+            sec_per_step=1.0,  # will get actual time during each train-step
+            micro_batchsize=self.optimizer_cfg.micro_batch_size,
+            activation_checkpointing=self.model.is_gradient_checkpointing,
+            vocab_size=self.model.config.vocab_size,
+            hidden_size=self.model.config.hidden_size,
+            decoder_num_layers=self.model.config.num_decoder_layers,
+            encoder_num_layers=self.model.config.num_layers,
+            decoder_seq_len=batch["decoder_input_ids"].shape[-1],
+            encoder_seq_len=batch["input_ids"].shape[-1],
+            use_gated_mlp=getattr(self.model.config, "is_gated_act", False),
+        )
+
+    def on_train_batch_end(self, outputs, batch, batch_idx):
+        """
+        Log time/step and TFLOPS
+        Args:
+            outputs: outputs of train_step, not used, required for hook
+            batch: use batch to get input/output sequence length for TFLOPs
+            batch_idx: batch number, not used required for hook
+        """
+
+        if batch_idx > 0 and batch_idx % self.trainer.log_every_n_steps == 0:
+
+            # get the time for this iteration
+            elapsed_time = time.monotonic() - self._last_logged_batch_start_time
+            # start timeer for the next iteration
+            self._last_logged_batch_start_time = time.monotonic()
+
+            time_per_step = elapsed_time / self.trainer.log_every_n_steps
+
+            if not hasattr(self, "tflops_per_train_step"):
+                # calculate once based on the model
+                # then use timing going forward
+                self.calculate_model_tflops(batch)
+
+            tflops = self.tflops_per_train_step / time_per_step
+            self.log(
+                "training_tflops",
+                tflops,
+                on_step=True,
+                on_epoch=False,
+                prog_bar=True,
+                logger=True,
+                rank_zero_only=True,
             )
 
-        tflops = self.tflops_per_train_step / batch_time
-        self.log(
-            "training_tflops",
-            tflops,
-            on_step=True,
-            on_epoch=False,
-            prog_bar=True,
-            logger=True,
-        )
+            # useful to log this even though PTL provides it in the progressbar
+            # PTL logs provide exponential decaying average which is not useful
+            # forquick benchmarking, especially for large models
+            self.log(
+                f"sec/step",
+                time_per_step,
+                on_step=True,
+                prog_bar=True,
+                logger=True,
+                rank_zero_only=True,
+            )
 
     def validation_step(self, batch, batch_idx):
 
@@ -151,14 +201,14 @@ class PlModel(pl.LightningModule):
         return {"loss": loss, "num_loss_tokens": num_loss_tokens}
 
     def on_train_start(self):
-        
-        #override the lambda schedulers
-        #default configs do not adjust the schedulers 
-        self.lr_schedulers().lr_lambdas = [
-                lambda x: self.optimizer_cfg.override.mult_factor * fn(x+self.optimizer_cfg.override.add_index)
-                for fn in self.lr_schedulers().lr_lambdas
-        ]
 
+        # override the lambda schedulers
+        # default configs do not adjust the schedulers
+        self.lr_schedulers().lr_lambdas = [
+            lambda x: self.optimizer_cfg.override.mult_factor
+            * fn(x + self.optimizer_cfg.override.add_index)
+            for fn in self.lr_schedulers().lr_lambdas
+        ]
 
     def validation_epoch_end(self, outputs):
 
@@ -178,10 +228,10 @@ class PlModel(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        
-        #hyperparameter logging needs to occur after ddp launch
-        #inside config_optimizers since this occurs after ddp launch
-        #use trainer logger which ensures it is mstar logger
+
+        # hyperparameter logging needs to occur after ddp launch
+        # inside config_optimizers since this occurs after ddp launch
+        # use trainer logger which ensures it is mstar logger
         self.trainer.logger.log_hyperparams(self.full_experiment_config)
 
         # create the optimizer, exclude "bias", "LayerNorm" from decaying
@@ -208,13 +258,18 @@ class PlModel(pl.LightningModule):
         ]
 
         param_groups = [
-            {"params": params_decay, "weight_decay": self.optimizer_cfg.optimizer.weight_decay},
+            {
+                "params": params_decay,
+                "weight_decay": self.optimizer_cfg.optimizer.weight_decay,
+            },
             {"params": params_nodecay, "weight_decay": 0.0},
         ]
 
-        #need convert="partial" to avoid hydra converting 
-        #param_groups into an OmegaConf, which breaks optimizer creation 
-        optimizer = hydra.utils.instantiate(self.optimizer_cfg.optimizer, _convert_="partial", params=param_groups)
+        # need convert="partial" to avoid hydra converting
+        # param_groups into an OmegaConf, which breaks optimizer creation
+        optimizer = hydra.utils.instantiate(
+            self.optimizer_cfg.optimizer, _convert_="partial", params=param_groups
+        )
 
         scheduler = hydra.utils.call(self.optimizer_cfg.scheduler, optimizer=optimizer)
         return (
