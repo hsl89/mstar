@@ -188,7 +188,7 @@ def main(cfg):
             run_name = '{}-input-{}'.format(cfg.model.model_type, cfg.data.max_seq_length)
         else:
             run_name = cfg.run_name
-        mstar_logger = MStarEKSLogger(experiment_name="gpt2-experiment",
+        mstar_logger = MStarEKSLogger(experiment_name=cfg.experiment_name,
                                       run_name=run_name, tags={"mode": "Training"})
     if cfg.trainer.gpus == -1:
         cfg.trainer.gpus = torch.cuda.device_count()
