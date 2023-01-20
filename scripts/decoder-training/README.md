@@ -28,10 +28,10 @@ Note that `scripts/docker_wrapper.sh` contains a user/date-specific tag. You sho
 ```
 bash scripts/docker_wrapper.sh
 ```
-3. If you have made code edits, you will need to edit the config `config/colehawk/52B_shard24.yaml`.
+3. If you have made code edits, you will need to edit the config [`example_eks_config/colehawk/52B_shard24.yaml`](example_eks_config/colehawk/52B_shard24.yaml).
 
 3. Submit 
 
 ```
-mstarxp submit -f config/colehawk/52B_shard24.yaml
+mstarxp submit -f example_eks_config/colehawk/52B_shard24.yaml
 ```
