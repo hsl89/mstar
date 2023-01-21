@@ -1,0 +1,30 @@
+args:
+- --nnodes=32 
+- --nproc_per_node=8
+- --max_restarts=0
+- pretrain_main.py
+- experiment_name=colehawk/arch_ablation
+- run_name=5B_arch_ablation_stg1
+- deepspeed_path=config/deepspeed/bf16_zero2d.json
+- max_steps=163000 #chosen for 200B tokens
+- model=5B
+- lightning/plugins/environment=torch_elastic #necessary for elastic controller
+- model.ckpt_path="auto"
+- optimization.optimizer.lr=0.00025
+- optimization/scheduler=linear
+- lightning.callbacks.checkpoint.every_n_train_steps=6000 #~4hrs per ckpt
+- trainer.limit_val_batches=50
+- optimization.micro_batch_size=2
+- data=stage_2_01_06 #default is mixed
+- data.collator_output_targets=t5 #override with t5 loss for stg1
+- data.clm_max_doc=1 #only matters with mixed clm/t5 output
+command: ["python3","-m","torch.distributed.run"]
+image: 747303060528.dkr.ecr.us-east-1.amazonaws.com/mstar-eks:colehawk-bedrock-01-07-dev
+name: colehawk-arch-5B-stg1
+node_type: p4d.24xlarge
+dag_type: "elastic_job_dag" # elastic job dag type
+node_num: 32
+min_replica: 32
+max_replica: 32
+updated_replica: 32
+max_dag_triggers: 20 # this parameter will trigger the restart of the dag if the launch job failed for some reason
