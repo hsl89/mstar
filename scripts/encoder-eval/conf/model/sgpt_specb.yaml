@@ -1,0 +1,34 @@
+model_class: SGPT
+inference_fn: "hf_model_inference_fn"
+load_model_fn: "load_hf_model"
+
+model_params:
+  symmetric_search: False
+  model_name: "Muennighoff/SGPT-125M-weightedmean-msmarco-specb-bitfit"
+  use_bfloat16: True
+  inference_fn_kwargs:
+    pooling_strategy: "weighted_mean"
+
+tokenizer_params:
+  tokenizer_name: "Muennighoff/SGPT-125M-weightedmean-msmarco-specb-bitfit" 
+  kwargs:
+    max_length: 304
+    add_special_tokens: True
+    truncation: True
+    padding: True
+    pad_to_multiple_of: 8
+    return_tensors: "pt"
+  
+data_params:
+  preprocessing: 
+    - "lower_case"
+  batch_size: 32
+  sep: " "
+
+evaluator_constructor_kwargs:
+  retrieval:
+    score_function: "dot" # or cos_sim
+
+evaluator_run_kwargs:
+  clustering:
+    clustering_batch_size: 64

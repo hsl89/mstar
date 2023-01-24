@@ -1,0 +1,27 @@
+model_backend: hf
+task_type: "Clustering"
+task_name: "BiorxivClusteringP2P"
+use_ddp: True
+debug: True
+
+model_params:
+  model_name: "facebook/contriever"
+  use_bfloat16: False
+  inference_fn_kwargs:
+    pooling_strategy: "mean"
+
+tokenizer_params:
+  tokenizer_name: "facebook/contriever"
+  kwargs:
+    max_length: 512
+    add_special_tokens: True
+    truncation: True
+    padding: True
+    pad_to_multiple_of: 8
+    return_tensors: "pt"
+
+data_params:
+  batch_size: 2
+  sep: " "
+
+

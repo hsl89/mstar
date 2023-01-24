@@ -1,0 +1,23 @@
+ARG REGION
+FROM 747303060528.dkr.ecr.$REGION.amazonaws.com/mstar-gitlab:base1.7 as base 
+
+COPY . /usr/local/src/mstar/
+
+RUN python3 -m pip install torch==1.13.1
+
+RUN cd /usr/local/src/mstar && TORCH_CUDA_ARCH_LIST="8.0 7.5 7.0" FORCE_CUDA=1 python3 -m pip install /usr/local/src/mstar --no-build-isolation
+
+RUN apt update && \
+  apt install -y \
+  vim \
+  gdb \
+  psmisc
+
+RUN python3 -m pip install beir==1.0.1 \
+  jsonlines==3.1.0 \
+  ipdb==0.13.9 \
+  fire==0.4.0 \
+  loguru \
+  hydra-core
+
+

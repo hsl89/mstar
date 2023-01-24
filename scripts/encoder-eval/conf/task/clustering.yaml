@@ -1,0 +1,6 @@
+task_type: "clustering"
+task_name: 
+  - "RedditClustering"
+  - "BiorixClusteringP2P"
+  - "TwentyNewsgroupsClustering"
+  - "ArixvClusteringP2P"

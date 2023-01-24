@@ -1,0 +1,33 @@
+model_class: EncoderModel
+inference_fn: "hf_model_inference_fn"
+load_model_fn: "load_hf_model"
+
+model_params:
+  model_name: "princeton-nlp/sup-simcse-bert-large-uncased"
+  use_bfloat16: False
+  inference_fn_kwargs:
+    pooling_strategy: "cls"
+
+tokenizer_params:
+  tokenizer_name: "princeton-nlp/sup-simcse-bert-large-uncased"
+  kwargs:
+    max_length: 512 # factory setting 512
+    add_special_tokens: True
+    truncation: True
+    padding: True
+    pad_to_multiple_of: 8
+    return_tensors: "pt"
+  
+data_params:
+  preprocessing: 
+    - "lower_case"
+  batch_size: 1024 # 32
+  sep: " "
+
+evaluator_constructor_kwargs:
+  retrieval:
+    score_function: "dot" # or cos_sim
+
+evaluator_run_kwargs:
+  clustering:
+    clustering_batch_size: 64

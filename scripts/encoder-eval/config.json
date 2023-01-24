@@ -1,0 +1,7 @@
+{
+    "data_cache_dir": "/mnt/encoder_eval",
+    "model_cache_dir": "/mnt/encoder_model",
+    "error_log_path": "/tmp/error_logs.txt",
+    "log_path": "/tmp/log.txt",
+    "test_sentences": "test_sentences.jsonl"
+}

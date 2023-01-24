@@ -1,0 +1,11 @@
+task_type: "sts"
+task_name: 
+  - "STS12"
+  - "STS13"
+  - "SICK-R"
+  - "STS17"
+  - "STS22"
+
+task_langs:
+  - en
+  - en-en

@@ -1,0 +1,5 @@
+task_type: "retrieval"
+task_name: 
+  - "FiQA2018"
+  - "SCIDOCS"
+  - "SciFact"

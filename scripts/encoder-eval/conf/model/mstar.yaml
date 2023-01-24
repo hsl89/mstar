@@ -1,0 +1,34 @@
+model_class: EncoderModel
+inference_fn: "mstar_inference_fn"
+load_model_fn: "load_mstar_model"
+
+model_params:
+  model_name: "mstar-bert-5B-bedrock-expmodel-20221110-weightaverage-mtlv2K1M-msmarcosupcl"
+  use_bfloat16: True
+  inference_fn_kwargs:
+    pooling_strategy: "mean"
+
+tokenizer_params:
+  tokenizer_name: "roberta-large"
+  kwargs:
+    max_length: 512
+    add_special_tokens: True
+    truncation: True
+    padding: True
+    pad_to_multiple_of: 8
+    return_tensors: "pt"
+  
+data_params:
+  preprocessing: 
+    - "lower_case"
+  batch_size: 4
+  sep: " "
+
+evaluator_constructor_kwargs:
+  retrieval:
+    score_function: "dot" # or cos_sim
+
+evaluator_run_kwargs:
+  clustering:
+    clustering_batch_size: 64
+

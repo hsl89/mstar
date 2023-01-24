@@ -1,0 +1,14 @@
+defaults:
+  - _self_
+  - model: contriever
+  - task: retrieval
+
+split:
+  - "test"
+use_ddp: True
+debug: False
+exp_name: "encoder_model_eval_mteb"
+use_fake_inference: False
+
+
+

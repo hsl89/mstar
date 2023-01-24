@@ -1,0 +1,4 @@
+task_type: "retrieval"
+task_name:
+  - "SCIDOCS"
+  - "SciFact"
