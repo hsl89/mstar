@@ -3,7 +3,9 @@ arch_path: config/model/architecture/gpt2_1.3B_input1024.json
 # Whether to enable gradient checkpointing in the model
 gradient_checkpointing: false
 # Whether to enable fused softmax in the model.
-fused_scaled_masked_softmax: true
+fused_scaled_masked_softmax: false
+# Whether to enable flash attention in the model.
+xformers_flash_attention: true
 # Whether to enable fused GeLU in the model.
 fused_gelu: true
 # where do you want to store the pretrained models downloaded from huggingface.co

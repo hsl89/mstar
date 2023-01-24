@@ -96,6 +96,7 @@ def main(cfg):
         {
             "vocab_size": len(tokenizer),
             "fused_scaled_masked_softmax": cfg.model.fused_scaled_masked_softmax,
+            "xformers_flash_attention": cfg.model.xformers_flash_attention,
             "fused_gelu": cfg.model.fused_gelu,
             "gradient_checkpointing": cfg.model.gradient_checkpointing,
             "precision": cfg.trainer.precision,

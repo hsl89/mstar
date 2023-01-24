@@ -63,6 +63,8 @@ requirements = [
     "datasets",
     "mlflow==1.30.0",
     "protobuf<=3.20.1",
+    # TODO(zhenghuj) Switch to official xformers flashattention after https://github.com/facebookresearch/xformers/pull/587 merged
+    "xformers@git+https://github.com/jfc4050/xformers@7df2df068255b16d3f103d88e04e17535557e3ef",
 ]
 
 tests_require = ["prospector", "pytest", "pytest-mock", "moto", "lorem"]

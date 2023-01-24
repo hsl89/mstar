@@ -1,9 +1,13 @@
-import numpy as np
 import torch
+import os
 import transformers
-import mstar
+import pytest
 from mstar.models.gpt2 import MStarGPT2Config, MStarGPT2LMHeadModel
-import random
+from mstar.models.gpt2_model import GPT2Attention
+from numpy.testing import assert_allclose
+
+CUR_DIR = os.path.dirname(os.path.realpath(__file__))
+
 
 DEVICE = "cuda"
 # smallest gpt2 model with 124M parameters
@@ -149,3 +153,100 @@ def test_generate():
 
     assert mstar_text_out == hf_text_out
 
+
+@pytest.mark.parametrize('N_CTX', [256, 512])
+@pytest.mark.parametrize('BATCH', [1, 2])
+@pytest.mark.parametrize('H', [1, 4])
+@pytest.mark.parametrize('D_HEAD', [64, 128])
+@pytest.mark.parametrize('bias_shape', ['bhqk', 'b11k', None])
+@pytest.mark.parametrize('use_head_mask', [True, False])
+# CI machine g4dn.16xlarge doesn't support bf16
+@pytest.mark.parametrize('dtype', [torch.float32, torch.float16])
+@pytest.mark.parametrize('cross_attn', [True, False])
+@pytest.mark.parametrize('use_alibi', [True, False])
+def test_gpt2_flash_attention(N_CTX, BATCH, H, D_HEAD, bias_shape, use_head_mask, use_alibi, dtype, cross_attn):
+    if use_alibi and not cross_attn:
+        return
+
+    atol, rtol = 1E-5, 1E-5
+    if use_alibi:
+        rtol = 1E-3
+    
+    if dtype == torch.float16 or dtype == torch.bfloat16:
+        atol, rtol = 1E-1, 1
+
+    device = 'cuda'
+    torch.manual_seed(1234)
+    q = torch.randn((BATCH, H, N_CTX, D_HEAD), dtype=dtype, device=device, requires_grad=True) / 10.0
+    k = torch.randn((BATCH, H, N_CTX, D_HEAD), dtype=dtype, device=device, requires_grad=True) / 10.0
+    v = torch.randn((BATCH, H, N_CTX, D_HEAD), dtype=dtype, device=device, requires_grad=True) / 10.0
+
+    if cross_attn:
+        if bias_shape == 'bhqk':
+            bias = torch.randint(0, 2, (BATCH, H, N_CTX, N_CTX), dtype=dtype, device=device, requires_grad=True).to(dtype)
+        elif bias_shape == 'b11k':
+            bias = torch.randint(0, 2, (BATCH, 1, 1, N_CTX), dtype=dtype, device=device, requires_grad=True).to(dtype)
+        else:
+            bias = None
+    else:
+        if bias_shape == 'bhqk':
+            bias = torch.ones((BATCH, H, N_CTX, N_CTX), dtype=dtype, device=device, requires_grad=True).to(dtype)
+        elif bias_shape == 'b11k':
+            bias = torch.ones((BATCH, 1, 1, N_CTX), dtype=dtype, device=device, requires_grad=True).to(dtype)
+        else:
+            bias = None
+
+    head_mask = None
+    if use_head_mask:
+        head_mask = torch.randint(0, 2, (BATCH, H, )).to(dtype).to(device).unsqueeze(-1).unsqueeze(-1).expand((BATCH, H, -1, -1)).to(dtype)
+
+    gpt2_config = transformers.AutoConfig.from_pretrained(CUR_DIR + "/gpt2.json")
+    setattr(gpt2_config,'fused_scaled_masked_softmax', False)
+    setattr(gpt2_config,'xformers_flash_attention', False)
+    if dtype == torch.float32:
+        setattr(gpt2_config,'precision', 32) # softmax precision
+    elif dtype == torch.float16:
+        setattr(gpt2_config,'precision', 16) # softmax precision
+    elif dtype == torch.bfloat16:
+        setattr(gpt2_config,'precision', 'bf16') # softmax precision
+    setattr(gpt2_config,'n_ctx', N_CTX) # seq len
+    setattr(gpt2_config,'n_positions', N_CTX) # seq len
+    setattr(gpt2_config,'n_head', H)
+    setattr(gpt2_config,'scale_attn_weights', True)
+    setattr(gpt2_config,'n_embed', H*D_HEAD)
+    setattr(gpt2_config,'hidden_size', H*D_HEAD)
+    setattr(gpt2_config,'positional_embedding', 'absolute')
+    if use_alibi:
+        setattr(gpt2_config,'positional_embedding', 'alibi')
+
+    gpt_attn = GPT2Attention(gpt2_config, cross_attn).to('cuda')
+
+    output_torch, _ = gpt_attn._attn_torch(q, k, v, attention_mask=bias, head_mask=head_mask)
+    output_xops = gpt_attn._attn_xformers_flash_attn(q.permute(0, 2, 1, 3), k.permute(0, 2, 1, 3), v.permute(0, 2, 1, 3), \
+        attention_mask=bias, head_mask=head_mask.permute(0, 2, 1, 3) if head_mask is not None else head_mask)
+
+    assert_allclose(output_torch.to(torch.float32).cpu().detach().numpy(), output_xops.to(torch.float32).cpu().detach().numpy(), atol, rtol)
+
+    grad_out = torch.randn(BATCH, H, N_CTX, D_HEAD, dtype=dtype, device="cuda")
+    q.retain_grad()
+    k.retain_grad()
+    v.retain_grad()
+    output_torch.backward(grad_out, retain_graph=True)
+
+    q_grad, k_grad, v_grad = q.grad, k.grad, v.grad
+
+
+    q.grad = None
+    k.grad = None
+    v.grad = None
+
+    output_xops.backward(grad_out, retain_graph=True)
+
+    q_xformer_grad, k_xformer_grad, v_xformer_grad = q.grad, k.grad, v.grad
+
+    if bias is not None and bias.requires_grad:
+        bias_xformer_grad = bias.grad
+
+    assert_allclose(q_grad.to(torch.float32).cpu().detach().numpy(), q_xformer_grad.to(torch.float32).cpu().detach().numpy(), atol, rtol)
+    assert_allclose(k_grad.to(torch.float32).cpu().detach().numpy(), k_xformer_grad.to(torch.float32).cpu().detach().numpy(), atol, rtol)
+    assert_allclose(v_grad.to(torch.float32).cpu().detach().numpy(), v_xformer_grad.to(torch.float32).cpu().detach().numpy(), atol, rtol)

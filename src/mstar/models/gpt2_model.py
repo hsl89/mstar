@@ -35,6 +35,8 @@ from transformers.configuration_utils import PretrainedConfig
 from mstar.utils.alibi import get_slopes
 import numpy as np
 
+import xformers.ops
+
 logger = logging.get_logger(__name__)
 
 _CHECKPOINT_FOR_DOC = "gpt2"
@@ -98,6 +100,7 @@ class GPT2Attention(nn.Module):
             self.c_attn = Conv1D(3 * self.embed_dim, self.embed_dim)
         self.c_proj = Conv1D(self.embed_dim, self.embed_dim)
 
+        self.attn_pdrop = config.attn_pdrop
         self.attn_dropout = nn.Dropout(config.attn_pdrop)
         self.resid_dropout = nn.Dropout(config.resid_pdrop)
 
@@ -121,7 +124,11 @@ class GPT2Attention(nn.Module):
             attention_mask_func,
             attention_softmax_in_fp32,
             None)
+        self.xformers_flash_attention = config.xformers_flash_attention
+        if config.xformers_flash_attention:
+            masked_softmax_fusion = False
         self.masked_softmax_fusion = masked_softmax_fusion
+        self.xformers_flash_attention = config.xformers_flash_attention
 
         self.pruned_heads = set()
 
@@ -145,9 +152,9 @@ class GPT2Attention(nn.Module):
             n_token = attn_weights.size(-1)
             if n_token < self.alibi.size(-1):
                 alibi = self.alibi[:, :, 0:n_token]
-                attn_weights = attn_weights + alibi.to(query.get_device()).unsqueeze(0)
+                attn_weights = attn_weights + alibi.to(query.get_device()).to(query.dtype).unsqueeze(0)
             else:
-                attn_weights = attn_weights + self.alibi.to(query.get_device()).unsqueeze(0)
+                attn_weights = attn_weights + self.alibi.to(query.get_device()).to(query.dtype).unsqueeze(0)
 
         if not self.is_cross_attention:
             # if only "normal" attention layer implements causal mask
@@ -194,9 +201,9 @@ class GPT2Attention(nn.Module):
             n_token = attn_weights.size(-1)
             if n_token < self.alibi.size(-1):
                 alibi = self.alibi[:, :, 0:n_token]
-                attn_weights = attn_weights + alibi.to(query.get_device()).unsqueeze(0)
+                attn_weights = attn_weights + alibi.to(query.get_device()).to(query.dtype).unsqueeze(0)
             else:
-                attn_weights = attn_weights + self.alibi.to(query.get_device()).unsqueeze(0)
+                attn_weights = attn_weights + self.alibi.to(query.get_device()).to(query.dtype).unsqueeze(0)
 
         if not self.is_cross_attention and \
            not self.scale_mask_softmax.is_kernel_available(*output_size):
@@ -214,6 +221,43 @@ class GPT2Attention(nn.Module):
         attn_output = torch.matmul(attn_weights, value)
 
         return attn_output, attn_weights
+
+    def _attn_xformers_flash_attn(self, query, key, value, attention_mask=None, head_mask=None):
+        scale = None
+        if not self.scale_attn_weights:
+            scale = 1.0
+        if not self.is_cross_attention:
+            # TODO(zhenghuj) For normal attention layers, xformers uses xformers.ops.LowerTriangularMask(). To add alibi support, 
+            # we need to add alibi from xformers/kernel side. 
+            if self.positional_embedding == 'alibi':
+                raise NotImplementedError("Alibi is not supported in normal attention layers.")
+            attn_output = xformers.ops.memory_efficient_attention(query, key, value, attn_bias=xformers.ops.LowerTriangularMask(), causal=True, p=self.attn_pdrop, scale=scale)
+        else:
+            if attention_mask is not None:
+                batch_size, n_heads = query.size(0), query.size(2)
+                n_queries, n_keys = query.size(1), key.size(1)
+                attention_mask = attention_mask.broadcast_to(batch_size, n_heads, n_queries, n_keys).reshape(-1, n_queries, n_keys)
+            # TODO(zhenghuj) Optimize alibi integration
+            if self.positional_embedding == 'alibi':
+                # if the number of input tokens is less than max expected tokens, resize the alibi bias
+                n_token = query.size(1)
+                n_keys = key.size(1)
+                batch_size, n_heads = query.size(0), query.size(2)
+                if n_token < self.alibi.size(-1):
+                    alibi = self.alibi[:, :, 0:n_token]
+                    if attention_mask is None:
+                        attention_mask = alibi.to(query.get_device()).to(query.dtype).broadcast_to(batch_size, n_heads, n_token, n_keys).reshape(-1, n_token, n_keys)
+                    else:
+                        attention_mask = attention_mask + alibi.to(query.get_device()).to(query.dtype).broadcast_to(batch_size, n_heads, n_token, n_keys).reshape(-1, n_token, n_keys)
+                else:
+                    if attention_mask is None:
+                        attention_mask = self.alibi.to(query.get_device()).to(query.dtype).broadcast_to(batch_size, n_heads, n_token, n_keys).reshape(-1, n_token, n_keys)
+                    else:
+                        attention_mask = attention_mask + self.alibi.to(query.get_device()).to(query.dtype).broadcast_to(batch_size, n_heads, n_token, n_keys).reshape(-1, n_token, n_keys)
+            attn_output = xformers.ops.memory_efficient_attention(query, key, value, attn_bias=attention_mask, causal=False, p=self.attn_pdrop, scale=scale)
+        if head_mask is not None:
+            attn_output = attn_output * head_mask
+        return attn_output.permute(0, 2, 1, 3)
 
     def _split_heads(self, tensor, num_heads, attn_head_size):
         """
@@ -271,6 +315,10 @@ class GPT2Attention(nn.Module):
 
         if self.masked_softmax_fusion:
             attn_output, attn_weights = self._attn_fused(query, key, value, attention_mask, head_mask)
+        elif self.xformers_flash_attention:
+            # TODO(zhenghuj) Cannot get attention_weights and raise warning
+            # TODO(zhenghuj) Remove permutation
+            attn_output = self._attn_xformers_flash_attn(query.permute(0, 2, 1, 3), key.permute(0, 2, 1, 3), value.permute(0, 2, 1, 3), attention_mask, head_mask)
         else:
             attn_output, attn_weights = self._attn_torch(query, key, value, attention_mask, head_mask)
 
@@ -543,6 +591,7 @@ class GPT2Config(PretrainedConfig):
         bos_token_id=50256,
         eos_token_id=50256,
         fused_scaled_masked_softmax=False,
+        xformers_flash_attention=False,
         fused_gelu=True,
         precision=16,
         positional_embedding="absolute",
@@ -575,6 +624,7 @@ class GPT2Config(PretrainedConfig):
         self.eos_token_id = eos_token_id
 
         self.fused_scaled_masked_softmax = fused_scaled_masked_softmax
+        self.xformers_flash_attention = xformers_flash_attention
         self.fused_gelu = fused_gelu
         self.precision = precision
         assert positional_embedding in [
@@ -952,7 +1002,7 @@ class GPT2Model(GPT2PreTrainedModel):
             # masked positions
             attention_mask = attention_mask.to(dtype=self.dtype)  # fp16 compatibility
             attention_mask = 1.0 - attention_mask
-            if not self.config.fused_scaled_masked_softmax:
+            if not self.config.fused_scaled_masked_softmax or self.config.xformers_flash_attention:
                 attention_mask = attention_mask * -10000.0
 
         # If a 2D ou 3D attention mask is provided for the cross-attention
